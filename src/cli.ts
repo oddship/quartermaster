@@ -105,15 +105,8 @@ program
         onEvent: handleEvent,
       });
 
-      // Validate the plan
-      const validation = validatePlan(plan);
-      if (!validation.valid) {
-        console.log(chalk.yellow("\nWarning: agent produced an invalid plan:"));
-        for (const e of validation.errors) {
-          const loc = e.action_index >= 0 ? `action[${e.action_index}].${e.field}` : e.field;
-          console.log(chalk.yellow(`  - ${loc}: ${e.message}`));
-        }
-      }
+      // Plan was already validated inside submit_plan tool.
+      // Agent got feedback and fixed errors before acceptance.
 
       // Write plan
       const outputPath = resolve(opts.output);

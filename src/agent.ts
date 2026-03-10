@@ -6,6 +6,7 @@ import { logger } from "./utils/logger.js";
 import { exec } from "./utils/exec.js";
 import { parseModelString, mapReasoningEffort, getApiKey } from "./model.js";
 import { SUBMIT_PLAN_SCHEMA } from "./plan.js";
+import { validatePlan } from "./validator.js";
 import { DEPS_SYSTEM_PROMPT } from "./deps/system-prompt.js";
 import { buildDepScanPrompt } from "./deps/prompt.js";
 import type { Plan, Platform } from "./types.js";
@@ -146,26 +147,64 @@ export async function scanRepo(opts: {
 
   let submittedPlan: Plan | null = null;
   let submitPlanCalls = 0;
+  const MAX_SUBMIT_ATTEMPTS = 3;
 
   const submitPlanTool: ToolDefinition = {
     name: "submit_plan",
     label: "Submit Plan",
-    description: "Submit the final dependency update plan after analysis is complete.",
+    description: "Submit the final dependency update plan after analysis is complete. The plan will be validated immediately. If validation fails, you will receive the errors and must fix and resubmit.",
     parameters: SUBMIT_PLAN_SCHEMA,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
       submitPlanCalls++;
+
       if (submittedPlan) {
-        logger.warn("Agent called submit_plan more than once; ignoring duplicate");
+        logger.warn("Agent called submit_plan after a valid plan was already accepted; ignoring");
         return {
-          content: [{ type: "text", text: "Plan already submitted. Do not call submit_plan again." }],
+          content: [{ type: "text", text: "A valid plan was already accepted. Do not call submit_plan again." }],
           details: { ignoredDuplicate: true },
         };
       }
-      submittedPlan = params as Plan;
-      logger.info(`Received plan via submit_plan (${submittedPlan.actions.length} action(s))`);
+
+      if (submitPlanCalls > MAX_SUBMIT_ATTEMPTS) {
+        logger.error(`Agent exceeded max submit attempts (${MAX_SUBMIT_ATTEMPTS})`);
+        return {
+          content: [{ type: "text", text: `Too many submission attempts (${submitPlanCalls}/${MAX_SUBMIT_ATTEMPTS}). Stop trying and explain the issues.` }],
+          details: { tooManyAttempts: true },
+        };
+      }
+
+      const candidate = params as Plan;
+      const result = validatePlan(candidate);
+
+      if (!result.valid) {
+        const errorLines = result.errors.map((e) => {
+          const loc = e.action_index >= 0 ? `action[${e.action_index}].${e.field}` : e.field;
+          return `- ${loc}: ${e.message}`;
+        });
+        const warningLines = result.warnings.map((w) => `- WARNING: ${w}`);
+        const feedback = [
+          `Plan validation FAILED (attempt ${submitPlanCalls}/${MAX_SUBMIT_ATTEMPTS}). Fix the following errors and call submit_plan again:`,
+          "",
+          ...errorLines,
+          ...(warningLines.length > 0 ? ["", ...warningLines] : []),
+        ].join("\n");
+
+        logger.warn(`submit_plan attempt ${submitPlanCalls} failed validation: ${result.errors.length} error(s)`);
+        return {
+          content: [{ type: "text", text: feedback }],
+          details: { validationErrors: result.errors, validationWarnings: result.warnings },
+        };
+      }
+
+      // Validation passed
+      if (result.warnings.length > 0) {
+        logger.info(`Plan accepted with ${result.warnings.length} warning(s)`);
+      }
+      submittedPlan = candidate;
+      logger.info(`Received valid plan via submit_plan (${submittedPlan.actions.length} action(s))`);
       return {
-        content: [{ type: "text", text: "Plan received. Do not output the plan as normal text." }],
-        details: {},
+        content: [{ type: "text", text: "Plan validated and accepted. Do not output the plan as normal text." }],
+        details: { warnings: result.warnings },
       };
     },
   };
