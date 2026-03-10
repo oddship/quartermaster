@@ -1,0 +1,66 @@
+name: Dogfood
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly, Sunday 2am UTC
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: 'Mission to run'
+        type: choice
+        options:
+          - deps
+          - docs-drift
+        default: deps
+      dry_run:
+        description: 'Dry run (no PRs/issues created)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  quartermaster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: gh auth setup-git
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run quartermaster
+        run: |
+          MISSION="${{ inputs.mission || 'deps' }}"
+          EXECUTE=""
+          if [ "${{ inputs.dry_run }}" = "false" ]; then
+            EXECUTE="--execute"
+          fi
+          # Scheduled runs always execute
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            EXECUTE="--execute"
+          fi
+          bun run src/cli.ts run \
+            --mission "$MISSION" \
+            --repo-dir "$GITHUB_WORKSPACE" \
+            $EXECUTE \
+            -v
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quartermaster-plan
+          path: plan.json
+          if-no-files-found: ignore
