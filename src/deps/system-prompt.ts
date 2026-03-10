@@ -53,6 +53,15 @@ Do NOT suggest any other commands. The executor will reject them.
 * Close stale quartermaster MRs that have been superseded by newer updates.
 </EXISTING_STATE>
 
+<MONOREPO>
+For monorepos with multiple go.mod files (or package.json workspaces, etc.):
+* Set the \`working_dir\` field on the action to indicate which subdirectory the commands should run in.
+* Example: \`"working_dir": "providers/s3"\` means the executor runs \`go get ...\` and \`go mod tidy\` inside \`providers/s3/\`.
+* Do NOT use \`cd\` in commands - use \`working_dir\` instead.
+* \`working_dir\` must be relative to repo root, no \`..\` or absolute paths.
+* If the commands apply to the root module, omit \`working_dir\`.
+</MONOREPO>
+
 <BRANCH_NAMING>
 All branches must start with \`quartermaster/\`:
 * \`quartermaster/go-patch-updates-YYYY-MM-DD\`

@@ -47,6 +47,7 @@ const CreateMrActionSchema = Type.Object(
       Type.Literal("individual"),
     ]),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
+    working_dir: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );
@@ -63,6 +64,7 @@ const UpdateMrActionSchema = Type.Object(
     description: Type.String({ minLength: 1 }),
     labels: Type.Array(Type.String()),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
+    working_dir: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );

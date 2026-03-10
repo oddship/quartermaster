@@ -57,6 +57,8 @@ export interface CreateMrAction extends BaseAction {
   test_command: string;
   labels: string[];
   fallback_strategy: FallbackStrategy;
+  /** Subdirectory to run commands in (for monorepos). Relative to repo root. */
+  working_dir?: string;
 }
 
 export interface UpdateMrAction extends BaseAction {
@@ -69,6 +71,8 @@ export interface UpdateMrAction extends BaseAction {
   test_command: string;
   description: string;
   labels: string[];
+  /** Subdirectory to run commands in (for monorepos). Relative to repo root. */
+  working_dir?: string;
 }
 
 export interface CreateIssueAction extends BaseAction {

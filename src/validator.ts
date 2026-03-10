@@ -120,6 +120,9 @@ function validateCreateMr(
     });
   }
 
+  // working_dir safety
+  validateWorkingDir(action.working_dir, index, errors);
+
   // Track packages for duplicate detection
   for (const update of action.updates) {
     trackPackage(update.package, index, seenPackages, warnings);
@@ -152,9 +155,27 @@ function validateUpdateMr(
     });
   }
 
+  // working_dir safety
+  validateWorkingDir(action.working_dir, index, errors);
+
   // Track packages
   for (const update of action.updates) {
     trackPackage(update.package, index, seenPackages, warnings);
+  }
+}
+
+function validateWorkingDir(
+  workingDir: string | undefined,
+  index: number,
+  errors: ValidationError[],
+): void {
+  if (!workingDir) return;
+  if (workingDir.includes("..") || workingDir.startsWith("/")) {
+    errors.push({
+      action_index: index,
+      field: "working_dir",
+      message: `Unsafe working_dir: "${workingDir}" (must be relative, no "..")`,
+    });
   }
 }
 

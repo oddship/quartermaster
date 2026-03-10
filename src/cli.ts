@@ -228,6 +228,7 @@ program
         console.log(chalk.blue(`  [${i}] DRY-RUN ${action.type} (confidence: ${action.confidence})`));
         if ("title" in action) console.log(chalk.dim(`        title: ${action.title}`));
         if ("branch" in action) console.log(chalk.dim(`        branch: ${action.branch}`));
+        if ("working_dir" in action && action.working_dir) console.log(chalk.dim(`        cwd: ${action.working_dir}`));
         if ("commands" in action && Array.isArray(action.commands)) {
           for (const cmd of action.commands) {
             console.log(chalk.dim(`        cmd: ${cmd}`));
