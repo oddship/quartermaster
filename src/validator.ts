@@ -101,6 +101,23 @@ function validateCreateMr(
   warnings: string[],
   seenPackages: Map<string, number>,
 ): void {
+  // Required field checks
+  const required: [string, unknown][] = [
+    ["branch", action.branch],
+    ["title", action.title],
+    ["description", action.description],
+    ["commands", action.commands],
+    ["updates", action.updates],
+    ["test_command", action.test_command],
+  ];
+  for (const [field, value] of required) {
+    if (value === undefined || value === null) {
+      errors.push({ action_index: index, field, message: `Missing required field: ${field}` });
+    }
+  }
+  // Bail early if required fields are missing to avoid crashes
+  if (!action.branch || !action.commands || !action.updates) return;
+
   // Branch pattern
   if (!BRANCH_PATTERN.test(action.branch)) {
     errors.push({
@@ -111,21 +128,25 @@ function validateCreateMr(
   }
 
   // Command allowlist
-  const disallowed = findDisallowedCommands(action.commands);
-  for (const cmd of disallowed) {
-    errors.push({
-      action_index: index,
-      field: "commands",
-      message: `Disallowed command: "${cmd}"`,
-    });
+  if (Array.isArray(action.commands)) {
+    const disallowed = findDisallowedCommands(action.commands);
+    for (const cmd of disallowed) {
+      errors.push({
+        action_index: index,
+        field: "commands",
+        message: `Disallowed command: "${cmd}"`,
+      });
+    }
   }
 
   // working_dir safety
   validateWorkingDir(action.working_dir, index, errors);
 
   // Track packages for duplicate detection
-  for (const update of action.updates) {
-    trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
+  if (Array.isArray(action.updates)) {
+    for (const update of action.updates) {
+      trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
+    }
   }
 }
 
@@ -136,6 +157,20 @@ function validateUpdateMr(
   warnings: string[],
   seenPackages: Map<string, number>,
 ): void {
+  // Required field checks
+  const required: [string, unknown][] = [
+    ["branch", action.branch],
+    ["mr_id", action.mr_id],
+    ["commands", action.commands],
+    ["updates", action.updates],
+  ];
+  for (const [field, value] of required) {
+    if (value === undefined || value === null) {
+      errors.push({ action_index: index, field, message: `Missing required field: ${field}` });
+    }
+  }
+  if (!action.branch || !action.commands || !action.updates) return;
+
   // Branch pattern
   if (!BRANCH_PATTERN.test(action.branch)) {
     errors.push({
@@ -146,21 +181,25 @@ function validateUpdateMr(
   }
 
   // Command allowlist
-  const disallowed = findDisallowedCommands(action.commands);
-  for (const cmd of disallowed) {
-    errors.push({
-      action_index: index,
-      field: "commands",
-      message: `Disallowed command: "${cmd}"`,
-    });
+  if (Array.isArray(action.commands)) {
+    const disallowed = findDisallowedCommands(action.commands);
+    for (const cmd of disallowed) {
+      errors.push({
+        action_index: index,
+        field: "commands",
+        message: `Disallowed command: "${cmd}"`,
+      });
+    }
   }
 
   // working_dir safety
   validateWorkingDir(action.working_dir, index, errors);
 
   // Track packages
-  for (const update of action.updates) {
-    trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
+  if (Array.isArray(action.updates)) {
+    for (const update of action.updates) {
+      trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
+    }
   }
 }
 
