@@ -264,9 +264,27 @@ export async function scanRepo(opts: {
 
   // Retry on transient LLM errors (e.g. JSON parse failures in tool calls).
   // The session keeps its state, so a retry continues the conversation.
+  // We tell the agent exactly what went wrong so it can fix the JSON.
   const MAX_PROMPT_RETRIES = 2;
   for (let attempt = 0; attempt <= MAX_PROMPT_RETRIES; attempt++) {
-    await session.prompt(attempt === 0 ? prompt : "Continue. Submit your plan via the submit_plan tool.");
+    let nextPrompt: string;
+    if (attempt === 0) {
+      nextPrompt = prompt;
+    } else {
+      nextPrompt = [
+        "Your previous submit_plan tool call failed because the JSON you produced was malformed (JSON parse error).",
+        "This is a formatting issue, not a content issue. Your plan content was fine.",
+        "",
+        "Please call submit_plan again with valid JSON. Common causes of malformed JSON:",
+        "- Unescaped newlines inside string values (use \\n instead)",
+        "- Trailing commas after the last item in arrays or objects",
+        "- Unescaped quotes inside string values",
+        "",
+        "Keep the plan exactly the same, just ensure the JSON is well-formed.",
+      ].join("\n");
+    }
+
+    await session.prompt(nextPrompt);
 
     const agentError = (session as unknown as { state: { error?: string } }).state?.error;
     if (agentError) {
