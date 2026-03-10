@@ -11,11 +11,22 @@ Load this skill when you find `package.json` in the repository.
 
 ## Finding Outdated Dependencies
 
-### npm
+Use `npx npm-check-updates --jsonUpgraded` to find ALL available updates,
+including minor/patch bumps within the current semver range. This is better
+than `npm outdated` which only shows packages where `latest` exceeds the
+range in package.json.
+
+### npm / bun
 ```bash
-npm outdated --json 2>/dev/null
+npx npm-check-updates --jsonUpgraded 2>/dev/null
 ```
-Output: JSON with `current`, `wanted`, `latest` for each outdated package.
+Output: JSON object mapping package names to their latest versions.
+Example: `{"chalk": "^5.6.2", "commander": "^14.0.3"}`
+
+To see current vs latest:
+```bash
+npx npm-check-updates 2>/dev/null
+```
 
 ### yarn
 ```bash
@@ -27,6 +38,11 @@ yarn outdated --json 2>/dev/null
 pnpm outdated --format json 2>/dev/null
 ```
 
+### Determining current versions
+
+Read `package.json` to get the current version ranges. Compare against the
+output of npm-check-updates to classify updates.
+
 Focus on `dependencies` and `devDependencies` (direct deps). Ignore transitive.
 
 ## Monorepo Workspaces
@@ -34,13 +50,13 @@ Focus on `dependencies` and `devDependencies` (direct deps). Ignore transitive.
 For yarn/npm/pnpm workspaces, check each workspace package:
 ```bash
 # npm workspaces
-npm outdated --json --workspaces 2>/dev/null
+npx npm-check-updates --jsonUpgraded --workspaces 2>/dev/null
 
 # Or check each workspace individually
 for pkg in packages/*/; do
   if [ -f "$pkg/package.json" ]; then
     echo "=== $pkg ==="
-    cd "$pkg" && npm outdated --json 2>/dev/null && cd - > /dev/null
+    cd "$pkg" && npx npm-check-updates --jsonUpgraded 2>/dev/null && cd - > /dev/null
   fi
 done
 ```
@@ -49,10 +65,13 @@ Use `working_dir` on the action to target specific workspace packages.
 
 ## Version Classification
 
-- **Patch**: 1.2.3 -> 1.2.5 (safe, batch together)
-- **Minor**: 1.2.3 -> 1.3.0 (usually safe, review changelog)
+- **Patch**: 1.2.3 -> 1.2.5 (safe, batch together in a PR)
+- **Minor**: 1.2.3 -> 1.3.0 (usually safe, batch with patch updates in a PR)
 - **Major**: 1.x -> 2.x (create issue, never batch)
-- **Pre-1.0**: 0.8 -> 0.11 (treat as potentially breaking)
+- **Pre-1.0**: 0.8 -> 0.11 (treat as potentially breaking, create issue)
+
+Patch and minor updates should be batched into `create_mr` actions.
+Major and pre-1.0 breaking updates should be `create_issue` actions.
 
 ## Commands (Allowlisted)
 
