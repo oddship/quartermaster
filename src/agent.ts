@@ -266,16 +266,17 @@ export async function scanRepo(opts: {
   // The session keeps its state, so a retry continues the conversation.
   // We tell the agent exactly what went wrong so it can fix the JSON.
   const MAX_PROMPT_RETRIES = 2;
+  let lastError = "";
   for (let attempt = 0; attempt <= MAX_PROMPT_RETRIES; attempt++) {
     let nextPrompt: string;
     if (attempt === 0) {
       nextPrompt = prompt;
     } else {
       nextPrompt = [
-        "Your previous submit_plan tool call failed because the JSON you produced was malformed (JSON parse error).",
-        "This is a formatting issue, not a content issue. Your plan content was fine.",
+        `Your previous submit_plan tool call failed with this error: ${lastError}`,
         "",
-        "Please call submit_plan again with valid JSON. Common causes of malformed JSON:",
+        "This is a JSON formatting issue, not a content issue. Your plan content was fine.",
+        "Please call submit_plan again with valid JSON. Common causes:",
         "- Unescaped newlines inside string values (use \\n instead)",
         "- Trailing commas after the last item in arrays or objects",
         "- Unescaped quotes inside string values",
@@ -289,6 +290,7 @@ export async function scanRepo(opts: {
     const agentError = (session as unknown as { state: { error?: string } }).state?.error;
     if (agentError) {
       if (attempt < MAX_PROMPT_RETRIES && /parse|json|malformed/i.test(agentError)) {
+        lastError = agentError;
         logger.warn(`LLM error (attempt ${attempt + 1}/${MAX_PROMPT_RETRIES + 1}), retrying: ${agentError}`);
         // Clear the error so the session can continue
         (session as unknown as { state: { error?: string } }).state.error = undefined;
