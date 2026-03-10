@@ -9,6 +9,7 @@ import { validatePlan } from "./validator.js";
 import { detectPlatform } from "./platform.js";
 import { scanRepo } from "./agent.js";
 import type { AgentProgressEvent } from "./agent.js";
+import { executePlan } from "./executor.js";
 import { setLogLevel } from "./utils/logger.js";
 import type { Plan, Platform } from "./types.js";
 
@@ -189,7 +190,11 @@ program
   .option("--execute", "Actually execute the plan (opt-in)", false)
   .option("--confidence-threshold <n>", "Skip actions below this confidence (0-1)", "0.5")
   .option("-v, --verbose", "Verbose logging", false)
-  .action((planFile: string, opts) => {
+  .option("--repo-dir <dir>", "Repository directory", ".")
+  .option("--platform <platform>", "Platform: gitlab or github")
+  .option("--project-url <url>", "Project URL (auto-detected)")
+  .option("--default-branch <branch>", "Default branch (auto-detected)")
+  .action(async (planFile: string, opts) => {
     if (opts.verbose) setLogLevel("debug");
 
     const planPath = resolve(planFile);
@@ -210,38 +215,59 @@ program
 
     const dryRun = !opts.execute;
     const threshold = parseFloat(opts.confidenceThreshold);
+    const repoDir = resolve(opts.repoDir);
+
+    // Detect platform
+    const platformConfig = await detectPlatform({
+      platform: opts.platform as Platform | undefined,
+      projectUrl: opts.projectUrl,
+      defaultBranch: opts.defaultBranch,
+      repoDir,
+    });
 
     console.log(chalk.bold.cyan("Quartermaster - Plan Execution"));
     console.log(chalk.dim(`File: ${planPath}`));
+    console.log(chalk.dim(`Repo: ${repoDir}`));
+    console.log(chalk.dim(`Platform: ${platformConfig.platform}`));
     console.log(chalk.dim(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`));
     console.log(chalk.dim(`Confidence threshold: ${threshold}`));
     console.log();
 
-    // Phase 4: executor runs here
-    for (const [i, action] of plan.actions.entries()) {
-      if (action.confidence < threshold) {
-        console.log(chalk.dim(`  [${i}] SKIP (confidence ${action.confidence} < ${threshold}): ${action.type}`));
-        continue;
+    try {
+      const result = await executePlan(plan, {
+        repoDir,
+        platform: platformConfig.platform,
+        defaultBranch: platformConfig.defaultBranch,
+        dryRun,
+        confidenceThreshold: threshold,
+        verbose: opts.verbose,
+      });
+
+      // Print results
+      for (const r of result.results) {
+        const icon = r.status === "success" ? chalk.green("OK")
+          : r.status === "skipped" ? chalk.blue("--")
+          : chalk.red("XX");
+        console.log(`  ${icon} [${r.index}] ${r.action.type}: ${r.message}`);
+        if (r.ref) console.log(chalk.dim(`       ref: ${r.ref}`));
       }
+
+      console.log();
+      console.log(chalk.dim(
+        `Total: ${result.summary.total} | ` +
+        `${chalk.green(`Success: ${result.summary.success}`)} | ` +
+        `${chalk.red(`Failed: ${result.summary.failed}`)} | ` +
+        `Skipped: ${result.summary.skipped}`,
+      ));
 
       if (dryRun) {
-        console.log(chalk.blue(`  [${i}] DRY-RUN ${action.type} (confidence: ${action.confidence})`));
-        if ("title" in action) console.log(chalk.dim(`        title: ${action.title}`));
-        if ("branch" in action) console.log(chalk.dim(`        branch: ${action.branch}`));
-        if ("working_dir" in action && action.working_dir) console.log(chalk.dim(`        cwd: ${action.working_dir}`));
-        if ("commands" in action && Array.isArray(action.commands)) {
-          for (const cmd of action.commands) {
-            console.log(chalk.dim(`        cmd: ${cmd}`));
-          }
-        }
-      } else {
-        console.log(chalk.yellow(`Executor not yet implemented (Phase 4)`));
-        process.exit(1);
+        console.log(chalk.green("\nDry run complete. Use --execute to run for real."));
       }
-    }
 
-    if (dryRun) {
-      console.log(chalk.green("\nDry run complete. Use --execute to run for real."));
+      if (result.summary.failed > 0) process.exit(1);
+    } catch (err) {
+      console.error(chalk.red(`Execution failed: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
     }
   });
 
@@ -263,10 +289,92 @@ program
   .action(async (opts) => {
     if (opts.verbose) setLogLevel("debug");
 
+    const repoDir = resolve(opts.repoDir);
+    const platformConfig = await detectPlatform({
+      platform: opts.platform as Platform | undefined,
+      projectUrl: opts.projectUrl,
+      defaultBranch: opts.defaultBranch,
+      repoDir,
+    });
+
+    const dryRun = !opts.execute;
+    const threshold = parseFloat(opts.confidenceThreshold);
+
     console.log(chalk.bold.cyan("Quartermaster - Full Pipeline"));
-    console.log(chalk.yellow("Full pipeline not yet implemented (Phase 3+4)"));
-    console.log(chalk.dim("Use 'scan' + 'validate' + 'execute' individually for now."));
-    process.exit(0);
+    console.log(chalk.dim(`Repo: ${repoDir}`));
+    console.log(chalk.dim(`Platform: ${platformConfig.platform}`));
+    console.log(chalk.dim(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`));
+    console.log(chalk.dim(`Model: ${opts.model}`));
+    console.log();
+
+    // 1. Scan
+    console.log(chalk.bold("Phase 1: Scanning..."));
+    const toolIcons: Record<string, string> = {
+      bash: "$", read: "cat", grep: "grep", find: "find", ls: "ls",
+    };
+
+    const { plan, metrics } = await scanRepo({
+      repoDir,
+      platform: platformConfig.platform,
+      projectUrl: platformConfig.projectUrl,
+      defaultBranch: platformConfig.defaultBranch,
+      model: opts.model,
+      reasoningEffort: opts.reasoningEffort,
+      onEvent: (event) => {
+        if (event.type === "turn_start") console.log(chalk.dim(`  Turn ${event.turnIndex ?? "?"}`));
+        if (event.type === "tool_start") {
+          const icon = toolIcons[event.toolName ?? ""] ?? event.toolName;
+          console.log(chalk.dim(`  ${icon} ${(event.toolArgs ?? "").slice(0, 80)}`));
+        }
+      },
+    });
+
+    console.log(chalk.dim(`Scan: ${plan.actions.length} actions, ${metrics.turns} turns, $${metrics.cost.toFixed(4)}`));
+
+    // Save plan if requested
+    if (opts.output) {
+      const outputPath = resolve(opts.output);
+      writeFileSync(outputPath, JSON.stringify(plan, null, 2));
+      console.log(chalk.dim(`Plan saved to ${outputPath}`));
+    }
+
+    if (plan.actions.length === 0) {
+      console.log(chalk.green("\nNo updates needed. Repository is up to date."));
+      return;
+    }
+
+    // 2. Execute
+    console.log(chalk.bold("\nPhase 2: Executing..."));
+    const result = await executePlan(plan, {
+      repoDir,
+      platform: platformConfig.platform,
+      defaultBranch: platformConfig.defaultBranch,
+      dryRun,
+      confidenceThreshold: threshold,
+      verbose: opts.verbose,
+    });
+
+    for (const r of result.results) {
+      const icon = r.status === "success" ? chalk.green("OK")
+        : r.status === "skipped" ? chalk.blue("--")
+        : chalk.red("XX");
+      console.log(`  ${icon} [${r.index}] ${r.action.type}: ${r.message}`);
+      if (r.ref) console.log(chalk.dim(`       ref: ${r.ref}`));
+    }
+
+    console.log();
+    console.log(chalk.dim(
+      `Total: ${result.summary.total} | ` +
+      `Success: ${result.summary.success} | ` +
+      `Failed: ${result.summary.failed} | ` +
+      `Skipped: ${result.summary.skipped}`,
+    ));
+
+    if (dryRun) {
+      console.log(chalk.green("\nDry run complete. Use --execute to run for real."));
+    }
+
+    if (result.summary.failed > 0) process.exit(1);
   });
 
 program.parse();
