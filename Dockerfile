@@ -1,15 +1,24 @@
+# Quartermaster - base image
+# Ships the framework + built-in missions. Language toolchains (Go, Node, etc.)
+# come from the CI runner or a derived image.
+#
+# Usage:
+#   docker run ghcr.io/oddship/quartermaster scan --help
+#
+# Extend with language toolchains:
+#   FROM ghcr.io/oddship/quartermaster:latest
+#   RUN apt-get update && apt-get install -y golang-go nodejs npm
+#   COPY my-missions/ /app/missions/
+
 FROM oven/bun:1 AS base
 WORKDIR /build
 
-# Install dependencies into temp dirs for caching
+# Install dependencies
 FROM base AS install
-
-# Dev dependencies (for build)
 RUN mkdir -p /temp/dev
 COPY package.json bun.lock* /temp/dev/
 RUN cd /temp/dev && bun install --frozen-lockfile 2>/dev/null || cd /temp/dev && bun install
 
-# Production dependencies only
 RUN mkdir -p /temp/prod
 COPY package.json bun.lock* /temp/prod/
 RUN cd /temp/prod && (bun install --frozen-lockfile --production 2>/dev/null || bun install --production)
@@ -19,13 +28,13 @@ FROM base AS build
 COPY --from=install /temp/dev/node_modules node_modules
 COPY tsconfig.json tsup.config.ts package.json ./
 COPY src ./src
-COPY templates ./templates
 RUN bun run build
 
-# Final stage
+# Final stage - slim base with framework tools only
 FROM oven/bun:1-slim
 
-# Install system dependencies
+# Framework dependencies: git (always), jq + ripgrep (agent exploration),
+# gh + glab (platform CLIs for MR/issue management)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
@@ -34,15 +43,6 @@ RUN apt-get update && \
         jq && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install Go (v1 only supports Go repos)
-ARG GO_VERSION=1.24.1
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz && \
-    tar -C /usr/local -xzf /tmp/go.tar.gz && \
-    rm /tmp/go.tar.gz
-ENV PATH="/usr/local/go/bin:${PATH}"
-ENV GOPATH="/go"
-ENV PATH="${GOPATH}/bin:${PATH}"
 
 # Install ripgrep
 RUN curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep_15.1.0-1_amd64.deb" -o /tmp/ripgrep.deb && \
@@ -66,16 +66,17 @@ WORKDIR /app
 # Copy built application and production deps
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=build /build/dist ./dist
-COPY --from=build /build/templates ./templates
 COPY --from=build /build/package.json ./
-COPY skills ./skills
+
+# Built-in missions
+COPY missions ./missions
 
 ENV COLUMNS=200
 ENV LINES=50
 
 # Workspace for cloned/mounted repos
-RUN mkdir -p /workspace /tmp/quartermaster /go && \
-    chown -R bun:bun /app /workspace /tmp/quartermaster /go
+RUN mkdir -p /workspace /tmp/quartermaster && \
+    chown -R bun:bun /app /workspace /tmp/quartermaster
 
 LABEL org.opencontainers.image.title="Quartermaster" \
       org.opencontainers.image.description="Scheduled agent framework for repository maintenance" \

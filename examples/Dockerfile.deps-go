@@ -1,0 +1,18 @@
+# Example: Quartermaster with Go toolchain for dependency updates.
+# Build: docker build -f examples/Dockerfile.deps-go -t quartermaster-go .
+# Run:   docker run -v $(pwd):/workspace quartermaster-go scan --repo-dir /workspace
+
+FROM ghcr.io/oddship/quartermaster:latest
+
+USER root
+
+# Install Go
+ARG GO_VERSION=1.24.1
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz && \
+    tar -C /usr/local -xzf /tmp/go.tar.gz && \
+    rm /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:/go/bin:${PATH}"
+ENV GOPATH="/go"
+RUN mkdir -p /go && chown -R bun:bun /go
+
+USER bun

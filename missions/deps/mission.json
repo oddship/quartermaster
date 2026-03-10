@@ -1,0 +1,4 @@
+{
+  "name": "deps",
+  "description": "Scan for outdated dependencies and create update PRs/issues"
+}

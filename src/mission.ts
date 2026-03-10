@@ -3,12 +3,16 @@
 
 import type { Platform } from "./types.js";
 
-/** Context passed to the prompt builder. Missions extend this with their own fields. */
+/** Context passed to the prompt builder. Core gathers these for every mission. */
 export interface MissionContext {
   repoDir: string;
   projectUrl?: string;
   defaultBranch: string;
   platform: string;
+  /** Existing quartermaster MRs/PRs as JSON string */
+  existingMrs: string;
+  /** Existing quartermaster issues as JSON string */
+  existingIssues: string;
 }
 
 /** A mission is a pluggable maintenance task that runs on a schedule. */

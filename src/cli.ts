@@ -10,7 +10,7 @@ import { detectPlatform } from "./platform.js";
 import { scanRepo } from "./agent.js";
 import type { AgentProgressEvent } from "./agent.js";
 import { executePlan } from "./executor.js";
-import { getMission } from "./missions.js";
+import { getMission, setMissionsDir } from "./missions.js";
 import { setLogLevel } from "./utils/logger.js";
 import type { Plan, Platform } from "./types.js";
 
@@ -24,7 +24,14 @@ program
       "a typed action plan (JSON). The CLI executor then validates and\n" +
       "executes the plan deterministically.",
   )
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("--missions-dir <dir>", "Directory containing mission definitions")
+  .hook("preAction", () => {
+    const opts = program.opts();
+    if (opts.missionsDir) {
+      setMissionsDir(opts.missionsDir);
+    }
+  });
 
 // --- scan ---
 program

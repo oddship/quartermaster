@@ -1,0 +1,4 @@
+{
+  "name": "docs-drift",
+  "description": "Detect documentation that has drifted from source code changes"
+}

@@ -1,0 +1,18 @@
+# Example: Adding a custom mission to quartermaster.
+# Your mission is just a directory of files - no TypeScript needed.
+
+FROM ghcr.io/oddship/quartermaster:latest
+
+USER root
+
+# Install mission-specific tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends trivy && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Add your mission
+COPY my-security-mission/ /app/missions/security/
+
+USER bun
+
+# Run: docker run my-quartermaster scan --mission security --repo-dir /workspace

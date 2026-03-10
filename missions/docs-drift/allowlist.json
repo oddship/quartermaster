@@ -1,0 +1,4 @@
+[
+  { "binary": "sed", "prefixes": ["-i ", "-e "] },
+  { "binary": "tee", "prefixes": ["-a ", ""] }
+]

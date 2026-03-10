@@ -1,0 +1,11 @@
+[
+  { "binary": "go", "prefixes": ["get ", "mod tidy", "mod download"] },
+  { "binary": "npm", "prefixes": ["update ", "install ", "audit fix"] },
+  { "binary": "yarn", "prefixes": ["upgrade ", "add "] },
+  { "binary": "pnpm", "prefixes": ["update ", "add "] },
+  { "binary": "bun", "prefixes": ["update ", "add "] },
+  { "binary": "pip", "prefixes": ["install --upgrade ", "install -U "] },
+  { "binary": "poetry", "prefixes": ["update ", "add "] },
+  { "binary": "bundle", "prefixes": ["update "] },
+  { "binary": "cargo", "prefixes": ["update -p "] }
+]
