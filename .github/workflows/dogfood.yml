@@ -50,6 +50,7 @@ jobs:
           bun run src/cli.ts run \
             --mission "$MISSION" \
             --repo-dir "$GITHUB_WORKSPACE" \
+            -o plan.json \
             $EXECUTE \
             -v
         env:
