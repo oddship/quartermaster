@@ -121,6 +121,7 @@ const SkipActionSchema = Type.Object(
       Type.Literal("recently_updated"),
       Type.Literal("no_update_available"),
       Type.Literal("pinned"),
+      Type.Literal("not_applicable"),
     ]),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },

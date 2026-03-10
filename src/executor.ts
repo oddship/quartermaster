@@ -526,12 +526,27 @@ async function runAllowlistedCommands(
   }
 }
 
+// Test runners that are allowed as test_command.
+// These are read-only verification commands, separate from the mission allowlist.
+const TEST_COMMAND_BINARIES = new Set([
+  "go", "npm", "yarn", "pnpm", "bun", "make", "cargo",
+  "pytest", "python", "python3", "ruby", "bundle",
+  "mvn", "gradle", "dotnet",
+  "echo", // harmless, used as no-op test
+]);
+
 async function runTestCommand(
   testCommand: string,
   cwd: string,
 ): Promise<{ success: boolean; stdout: string; stderr: string }> {
   const parts = testCommand.split(/\s+/);
   const [binary, ...args] = parts;
+
+  if (!TEST_COMMAND_BINARIES.has(binary)) {
+    logger.warn(`test_command binary "${binary}" not in allowed test runners, skipping`);
+    return { success: true, stdout: "", stderr: `Skipped: "${binary}" not an allowed test runner` };
+  }
+
   logger.info(`test: ${testCommand} (in ${cwd})`);
   try {
     const result = await exec(binary, args, { cwd });

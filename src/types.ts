@@ -21,7 +21,8 @@ export type SkipReasonType =
   | "human_hold"
   | "recently_updated"
   | "no_update_available"
-  | "pinned";
+  | "pinned"
+  | "not_applicable";
 
 export interface DependencyUpdate {
   package: string;
