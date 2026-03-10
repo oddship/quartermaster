@@ -18,8 +18,8 @@
   },
   "files": [
     "dist",
-    "templates",
-    "skills"
+    "missions",
+    "examples"
   ],
   "keywords": [
     "ai",
