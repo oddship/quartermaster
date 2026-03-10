@@ -1,16 +1,13 @@
 // Agent session - creates a Pi SDK agent that scans a repo and produces a plan.
-// Same pattern as hodor's agent.ts but with submit_plan instead of submit_review.
+// Mission-agnostic: the mission provides the system prompt, skills, and context.
 
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { logger } from "./utils/logger.js";
-import { exec } from "./utils/exec.js";
 import { parseModelString, mapReasoningEffort } from "./model.js";
 import { SUBMIT_PLAN_SCHEMA } from "./plan.js";
 import { validatePlan } from "./validator.js";
-import { DEPS_SYSTEM_PROMPT } from "./deps/system-prompt.js";
-import { buildDepScanPrompt } from "./deps/prompt.js";
+import type { Mission } from "./mission.js";
 import type { Plan, Platform } from "./types.js";
-import type { DepScanContext } from "./deps/types.js";
 
 export interface AgentProgressEvent {
   type: "tool_start" | "tool_end" | "thinking" | "turn_start" | "turn_end" | "agent_start" | "agent_end" | "text_delta" | "thinking_delta";
@@ -36,6 +33,7 @@ export interface ScanResult {
 }
 
 export async function scanRepo(opts: {
+  mission: Mission;
   repoDir: string;
   platform: Platform;
   projectUrl: string;
@@ -45,6 +43,7 @@ export async function scanRepo(opts: {
   onEvent?: (event: AgentProgressEvent) => void;
 }): Promise<ScanResult> {
   const {
+    mission,
     repoDir,
     platform,
     projectUrl,
@@ -54,7 +53,7 @@ export async function scanRepo(opts: {
     onEvent,
   } = opts;
 
-  logger.info(`Starting dep scan for: ${repoDir}`);
+  logger.info(`Starting ${mission.name} scan for: ${repoDir}`);
 
   // Preflight: validate model
   const parsed = parseModelString(model);
@@ -99,20 +98,9 @@ export async function scanRepo(opts: {
   }
   logger.info(`Model resolved: ${piModel.name}`);
 
-  // Gather existing state for the prompt
-  const existingMrs = await gatherExistingMrs(repoDir, platform, projectUrl);
-  const existingIssues = await gatherExistingIssues(repoDir, platform, projectUrl);
-
-  const scanContext: DepScanContext = {
-    repoDir,
-    projectUrl,
-    defaultBranch,
-    platform,
-    existingMrs,
-    existingIssues,
-  };
-
-  const prompt = buildDepScanPrompt(scanContext);
+  // Gather mission-specific context and build prompt
+  const missionContext = await mission.gatherContext({ repoDir, platform, projectUrl, defaultBranch });
+  const prompt = mission.buildPrompt(missionContext);
 
   // Create agent session
   const startTime = Date.now();
@@ -120,22 +108,16 @@ export async function scanRepo(opts: {
     compaction: { enabled: false },
   });
 
-  // Resolve skills directory (relative to this file -> ../skills in source, or ../skills from dist)
-  const { dirname: pathDirname, join: pathJoin } = await import("node:path");
-  const { fileURLToPath: toPath } = await import("node:url");
-  const currentDir = pathDirname(toPath(import.meta.url));
-  const skillsDir = pathJoin(currentDir, "..", "skills");
-
   const resourceLoader = new DefaultResourceLoader({
     cwd: repoDir,
     settingsManager,
-    systemPrompt: DEPS_SYSTEM_PROMPT,
+    systemPrompt: mission.systemPrompt,
     appendSystemPrompt: "",
     noExtensions: true,
     noSkills: false,
     noPromptTemplates: true,
     noThemes: true,
-    additionalSkillPaths: [skillsDir],
+    additionalSkillPaths: [mission.skillsDir],
     agentsFilesOverride: () => ({ agentsFiles: [] }),
   });
   await resourceLoader.reload();
@@ -149,10 +131,13 @@ export async function scanRepo(opts: {
   let submitPlanCalls = 0;
   const MAX_SUBMIT_ATTEMPTS = 3;
 
+  // Pass mission allowlist to validator
+  const validateWithAllowlist = (plan: Plan) => validatePlan(plan, mission.allowlist);
+
   const submitPlanTool: ToolDefinition = {
     name: "submit_plan",
     label: "Submit Plan",
-    description: "Submit the final dependency update plan after analysis is complete. The plan will be validated immediately. If validation fails, you will receive the errors and must fix and resubmit.",
+    description: "Submit the final action plan after analysis is complete. The plan will be validated immediately. If validation fails, you will receive the errors and must fix and resubmit.",
     parameters: SUBMIT_PLAN_SCHEMA,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
       submitPlanCalls++;
@@ -174,7 +159,7 @@ export async function scanRepo(opts: {
       }
 
       const candidate = params as Plan;
-      const result = validatePlan(candidate);
+      const result = validateWithAllowlist(candidate);
 
       if (!result.valid) {
         const errorLines = result.errors.map((e) => {
@@ -315,48 +300,6 @@ export async function scanRepo(opts: {
 }
 
 // --- Helpers ---
-
-async function gatherExistingMrs(repoDir: string, platform: Platform, projectUrl: string): Promise<string> {
-  try {
-    if (platform === "gitlab" && projectUrl) {
-      // glab mr list defaults to open MRs; use -F for output format
-      const { stdout } = await exec("glab", [
-        "mr", "list", "--label", "quartermaster", "-F", "json",
-      ], { cwd: repoDir });
-      return stdout.trim() || "None found.";
-    }
-    if (platform === "github") {
-      const { stdout } = await exec("gh", [
-        "pr", "list", "--label", "quartermaster", "--state", "open", "--json", "number,title,headRefName,url",
-      ], { cwd: repoDir });
-      return stdout.trim() || "None found.";
-    }
-  } catch (err) {
-    logger.warn(`Failed to gather existing MRs: ${err}`);
-  }
-  return "Could not query existing MRs (auth may not be configured).";
-}
-
-async function gatherExistingIssues(repoDir: string, platform: Platform, projectUrl: string): Promise<string> {
-  try {
-    if (platform === "gitlab" && projectUrl) {
-      // glab issue list defaults to open issues; use -O for output format
-      const { stdout } = await exec("glab", [
-        "issue", "list", "--label", "quartermaster", "-O", "json",
-      ], { cwd: repoDir });
-      return stdout.trim() || "None found.";
-    }
-    if (platform === "github") {
-      const { stdout } = await exec("gh", [
-        "issue", "list", "--label", "quartermaster", "--state", "open", "--json", "number,title,url",
-      ], { cwd: repoDir });
-      return stdout.trim() || "None found.";
-    }
-  } catch (err) {
-    logger.warn(`Failed to gather existing issues: ${err}`);
-  }
-  return "Could not query existing issues (auth may not be configured).";
-}
 
 function formatToolArgs(_toolName: string, args: unknown, repoDir: string): string {
   if (typeof args === "string") return args.slice(0, 200);

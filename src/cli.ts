@@ -10,6 +10,7 @@ import { detectPlatform } from "./platform.js";
 import { scanRepo } from "./agent.js";
 import type { AgentProgressEvent } from "./agent.js";
 import { executePlan } from "./executor.js";
+import { getMission } from "./missions.js";
 import { setLogLevel } from "./utils/logger.js";
 import type { Plan, Platform } from "./types.js";
 
@@ -29,6 +30,7 @@ program
 program
   .command("scan")
   .description("Run the agent to scan a repo and produce a plan")
+  .option("--mission <name>", "Mission to run", "deps")
   .option("--repo-dir <dir>", "Repository directory to scan", ".")
   .option("-o, --output <file>", "Output plan JSON file", "plan.json")
   .option("--model <model>", "LLM model to use", "anthropic/claude-sonnet-4-20250514")
@@ -48,7 +50,10 @@ program
       repoDir,
     });
 
-    console.log(chalk.bold.cyan("Quartermaster - Dependency Scan"));
+    const mission = getMission(opts.mission);
+
+    console.log(chalk.bold.cyan(`Quartermaster - ${mission.description}`));
+    console.log(chalk.dim(`Mission: ${mission.name}`));
     console.log(chalk.dim(`Repo: ${repoDir}`));
     console.log(chalk.dim(`Platform: ${platformConfig.platform}`));
     console.log(chalk.dim(`Project: ${platformConfig.projectUrl}`));
@@ -97,6 +102,7 @@ program
 
     try {
       const { plan, metrics } = await scanRepo({
+        mission,
         repoDir,
         platform: platformConfig.platform,
         projectUrl: platformConfig.projectUrl,
@@ -190,6 +196,7 @@ program
   .option("--execute", "Actually execute the plan (opt-in)", false)
   .option("--confidence-threshold <n>", "Skip actions below this confidence (0-1)", "0.5")
   .option("-v, --verbose", "Verbose logging", false)
+  .option("--mission <name>", "Mission (for allowlist selection)", "deps")
   .option("--repo-dir <dir>", "Repository directory", ".")
   .option("--platform <platform>", "Platform: gitlab or github")
   .option("--project-url <url>", "Project URL (auto-detected)")
@@ -206,8 +213,10 @@ program
       process.exit(1);
     }
 
+    const mission = getMission(opts.mission);
+
     // Validate first
-    const validation = validatePlan(plan);
+    const validation = validatePlan(plan, mission.allowlist);
     if (!validation.valid) {
       console.error(chalk.red("Plan validation failed. Run 'quartermaster validate' for details."));
       process.exit(1);
@@ -241,6 +250,7 @@ program
         dryRun,
         confidenceThreshold: threshold,
         verbose: opts.verbose,
+        allowlist: mission.allowlist,
       });
 
       // Print results
@@ -275,6 +285,7 @@ program
 program
   .command("run")
   .description("Full pipeline: scan + validate + execute")
+  .option("--mission <name>", "Mission to run", "deps")
   .option("--repo-dir <dir>", "Repository directory to scan", ".")
   .option("--model <model>", "LLM model to use", "anthropic/claude-sonnet-4-20250514")
   .option("--reasoning-effort <level>", "Reasoning effort: low, medium, high")
@@ -289,6 +300,7 @@ program
   .action(async (opts) => {
     if (opts.verbose) setLogLevel("debug");
 
+    const mission = getMission(opts.mission);
     const repoDir = resolve(opts.repoDir);
     const platformConfig = await detectPlatform({
       platform: opts.platform as Platform | undefined,
@@ -301,6 +313,7 @@ program
     const threshold = parseFloat(opts.confidenceThreshold);
 
     console.log(chalk.bold.cyan("Quartermaster - Full Pipeline"));
+    console.log(chalk.dim(`Mission: ${mission.name}`));
     console.log(chalk.dim(`Repo: ${repoDir}`));
     console.log(chalk.dim(`Platform: ${platformConfig.platform}`));
     console.log(chalk.dim(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`));
@@ -314,6 +327,7 @@ program
     };
 
     const { plan, metrics } = await scanRepo({
+      mission,
       repoDir,
       platform: platformConfig.platform,
       projectUrl: platformConfig.projectUrl,
@@ -352,6 +366,7 @@ program
       dryRun,
       confidenceThreshold: threshold,
       verbose: opts.verbose,
+      allowlist: mission.allowlist,
     });
 
     for (const r of result.results) {

@@ -10,12 +10,14 @@ import type {
   ValidationResult,
   ValidationError,
 } from "./types.js";
-import { findDisallowedCommands } from "./deps/allowlist.js";
+import { findDisallowedCommands as findDisallowed, type AllowlistEntry } from "./mission.js";
+import { DEP_UPDATE_ALLOWLIST } from "./deps/allowlist.js";
 
 const BRANCH_PATTERN = /^quartermaster\/[\w.-]+$/;
 const MAX_ACTIONS = 20;
 
-export function validatePlan(plan: Plan): ValidationResult {
+export function validatePlan(plan: Plan, allowlist?: AllowlistEntry[]): ValidationResult {
+  const effectiveAllowlist = allowlist ?? (DEP_UPDATE_ALLOWLIST as AllowlistEntry[]);
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
 
@@ -43,7 +45,7 @@ export function validatePlan(plan: Plan): ValidationResult {
 
   for (let i = 0; i < plan.actions.length; i++) {
     const action = plan.actions[i];
-    validateAction(action, i, errors, warnings, seenPackages);
+    validateAction(action, i, errors, warnings, seenPackages, effectiveAllowlist);
   }
 
   return { valid: errors.length === 0, errors, warnings };
@@ -55,6 +57,7 @@ function validateAction(
   errors: ValidationError[],
   warnings: string[],
   seenPackages: Map<string, number>,
+  allowlist: AllowlistEntry[],
 ): void {
   // Confidence check
   if (typeof action.confidence !== "number" || action.confidence < 0 || action.confidence > 1) {
@@ -67,10 +70,10 @@ function validateAction(
 
   switch (action.type) {
     case "create_mr":
-      validateCreateMr(action, index, errors, warnings, seenPackages);
+      validateCreateMr(action, index, errors, warnings, seenPackages, allowlist);
       break;
     case "update_mr":
-      validateUpdateMr(action, index, errors, warnings, seenPackages);
+      validateUpdateMr(action, index, errors, warnings, seenPackages, allowlist);
       break;
     case "create_issue":
       // No special validation beyond schema
@@ -100,6 +103,7 @@ function validateCreateMr(
   errors: ValidationError[],
   warnings: string[],
   seenPackages: Map<string, number>,
+  allowlist: AllowlistEntry[],
 ): void {
   // Required field checks
   const required: [string, unknown][] = [
@@ -129,7 +133,7 @@ function validateCreateMr(
 
   // Command allowlist
   if (Array.isArray(action.commands)) {
-    const disallowed = findDisallowedCommands(action.commands);
+    const disallowed = findDisallowed(action.commands, allowlist);
     for (const cmd of disallowed) {
       errors.push({
         action_index: index,
@@ -156,6 +160,7 @@ function validateUpdateMr(
   errors: ValidationError[],
   warnings: string[],
   seenPackages: Map<string, number>,
+  allowlist: AllowlistEntry[],
 ): void {
   // Required field checks
   const required: [string, unknown][] = [
@@ -182,7 +187,7 @@ function validateUpdateMr(
 
   // Command allowlist
   if (Array.isArray(action.commands)) {
-    const disallowed = findDisallowedCommands(action.commands);
+    const disallowed = findDisallowed(action.commands, allowlist);
     for (const cmd of disallowed) {
       errors.push({
         action_index: index,

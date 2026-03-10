@@ -3,7 +3,8 @@
 
 import { join } from "node:path";
 import { exec, type ExecResult } from "./utils/exec.js";
-import { isCommandAllowed } from "./deps/allowlist.js";
+import { isCommandAllowed, type AllowlistEntry } from "./mission.js";
+import { DEP_UPDATE_ALLOWLIST } from "./deps/allowlist.js";
 import { logger } from "./utils/logger.js";
 import type {
   Action,
@@ -42,6 +43,8 @@ export interface ExecutorOptions {
   dryRun: boolean;
   confidenceThreshold: number;
   verbose: boolean;
+  /** Command allowlist for this mission. Defaults to dep update allowlist. */
+  allowlist?: AllowlistEntry[];
 }
 
 // --- Executor ---
@@ -144,7 +147,7 @@ async function executeCreateMr(
   try {
     // 3. Run whitelisted commands
     const cmdDir = action.working_dir ? join(repoDir, action.working_dir) : repoDir;
-    await runAllowlistedCommands(action.commands, cmdDir);
+    await runAllowlistedCommands(action.commands, cmdDir, opts.allowlist);
 
     // 4. Run tests
     if (action.test_command) {
@@ -219,7 +222,7 @@ async function executeIndividualFallback(
       // Build commands for this single update
       const singleCommands = buildSingleUpdateCommands(update, parentAction);
       const cmdDir = parentAction.working_dir ? join(repoDir, parentAction.working_dir) : repoDir;
-      await runAllowlistedCommands(singleCommands, cmdDir);
+      await runAllowlistedCommands(singleCommands, cmdDir, opts.allowlist);
 
       // Test
       if (parentAction.test_command) {
@@ -327,7 +330,7 @@ async function executeUpdateMr(
 
   // 3. Run commands
   const cmdDir = action.working_dir ? join(repoDir, action.working_dir) : repoDir;
-  await runAllowlistedCommands(action.commands, cmdDir);
+  await runAllowlistedCommands(action.commands, cmdDir, opts.allowlist);
 
   // 4. Test
   if (action.test_command) {
@@ -506,9 +509,10 @@ async function hasGitChanges(cwd: string): Promise<boolean> {
 async function runAllowlistedCommands(
   commands: string[],
   cwd: string,
+  allowlist: AllowlistEntry[] = DEP_UPDATE_ALLOWLIST as AllowlistEntry[],
 ): Promise<void> {
   for (const cmd of commands) {
-    if (!isCommandAllowed(cmd)) {
+    if (!isCommandAllowed(cmd, allowlist)) {
       throw new Error(`Blocked: command not in allowlist: "${cmd}"`);
     }
     const parts = cmd.split(/\s+/);
