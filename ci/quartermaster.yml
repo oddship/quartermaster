@@ -1,0 +1,98 @@
+# GitHub Actions Workflow for Quartermaster Dependency Updates
+#
+# Scans repositories for outdated dependencies and creates
+# pull requests / issues with intelligent grouping.
+#
+# Setup:
+#   1. Copy this file to .github/workflows/quartermaster.yml in your repo
+#   2. Set required secrets in Settings -> Secrets and variables -> Actions:
+#      - ANTHROPIC_API_KEY (or GEMINI_API_KEY, OPENAI_API_KEY)
+#   3. The default GITHUB_TOKEN is used for PR/issue creation
+#      (ensure it has write permissions in Settings -> Actions -> General)
+#
+# Optional repository variables (Settings -> Variables):
+#   - QUARTERMASTER_MODEL: LLM model (default: anthropic/claude-sonnet-4-20250514)
+#   - QUARTERMASTER_CONFIDENCE: Min confidence 0-1 (default: 0.5)
+
+name: Quartermaster Dependency Updates
+
+on:
+  schedule:
+    # Weekly: Sunday 2:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no PRs/issues created)'
+        type: boolean
+        default: false
+      model:
+        description: 'LLM model override'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  QUARTERMASTER_MODEL: ${{ inputs.model || vars.QUARTERMASTER_MODEL || 'anthropic/claude-sonnet-4-20250514' }}
+  QUARTERMASTER_CONFIDENCE: ${{ vars.QUARTERMASTER_CONFIDENCE || '0.5' }}
+
+jobs:
+  dependency-scan:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/oddship/quartermaster:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Configure git
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Configure gh CLI
+        run: gh auth setup-git
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine execution mode
+        id: mode
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" -a -z "${{ inputs.dry_run }}" ]; then
+            echo "exec_flag=" >> $GITHUB_OUTPUT
+            echo "Mode: DRY RUN"
+          else
+            echo "exec_flag=--execute" >> $GITHUB_OUTPUT
+            echo "Mode: LIVE"
+          fi
+
+      - name: Run Quartermaster
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Scanning ${{ github.repository }} with model $QUARTERMASTER_MODEL"
+          bun run /app/dist/cli.js run \
+            --repo-dir "$GITHUB_WORKSPACE" \
+            --model "$QUARTERMASTER_MODEL" \
+            --platform github \
+            --project-url "https://github.com/${{ github.repository }}" \
+            --default-branch "${{ github.event.repository.default_branch }}" \
+            --confidence-threshold "$QUARTERMASTER_CONFIDENCE" \
+            --output "$GITHUB_WORKSPACE/quartermaster-plan.json" \
+            ${{ steps.mode.outputs.exec_flag }}
+
+      - name: Upload plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quartermaster-plan
+          path: quartermaster-plan.json
+          retention-days: 30
