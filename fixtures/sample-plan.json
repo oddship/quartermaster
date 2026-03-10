@@ -1,0 +1,46 @@
+{
+  "repo_context": {
+    "platform": "gitlab",
+    "ecosystems": ["go"],
+    "test_command": "make test",
+    "default_branch": "master",
+    "lock_files": ["go.sum"]
+  },
+  "actions": [
+    {
+      "type": "create_mr",
+      "branch": "quartermaster/go-patch-updates-2026-03-10",
+      "title": "chore(deps): update Go patch dependencies",
+      "description": "Updates 3 Go dependencies to latest patch versions.\n\n- github.com/go-chi/chi/v5: v5.0.11 -> v5.0.14\n- github.com/rs/zerolog: v1.31.0 -> v1.31.2\n- github.com/spf13/viper: v1.18.1 -> v1.18.2",
+      "updates": [
+        { "package": "github.com/go-chi/chi/v5", "from": "v5.0.11", "to": "v5.0.14", "update_type": "patch" },
+        { "package": "github.com/rs/zerolog", "from": "v1.31.0", "to": "v1.31.2", "update_type": "patch" },
+        { "package": "github.com/spf13/viper", "from": "v1.18.1", "to": "v1.18.2", "update_type": "patch" }
+      ],
+      "commands": [
+        "go get github.com/go-chi/chi/v5@v5.0.14",
+        "go get github.com/rs/zerolog@v1.31.2",
+        "go get github.com/spf13/viper@v1.18.2",
+        "go mod tidy"
+      ],
+      "test_command": "make test",
+      "labels": ["quartermaster", "dependencies"],
+      "fallback_strategy": "individual_on_failure",
+      "confidence": 0.95
+    },
+    {
+      "type": "create_issue",
+      "title": "chore(deps): github.com/jackc/pgx/v5 v6.0.0 available (major)",
+      "body": "A major version update is available for pgx.\n\n**Current**: v5.5.1\n**Available**: v6.0.0\n**Released**: 2026-02-15\n\n## Breaking Changes\n- Connection pool API changed\n- `pgxpool.New()` replaces `pgxpool.Connect()`\n\n## Migration Guide\nhttps://github.com/jackc/pgx/wiki/Upgrading-to-v6\n\n## Affected Files\n- internal/db/postgres.go\n- internal/db/pool.go",
+      "labels": ["quartermaster", "dependencies", "major-update"],
+      "confidence": 0.9
+    },
+    {
+      "type": "skip",
+      "package": "golang.org/x/crypto",
+      "reason": "Already at latest version v0.21.0",
+      "reason_type": "no_update_available",
+      "confidence": 1.0
+    }
+  ]
+}
