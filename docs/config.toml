@@ -1,0 +1,13 @@
+site_name = "Quartermaster"
+base_path = "/quartermaster"
+
+[highlight]
+light = "github"
+dark  = "github-dark"
+
+[[links]]
+title = "GitHub"
+url = "https://github.com/oddship/quartermaster"
+
+[extra]
+footer = '&copy; <a href="https://github.com/oddship">oddship</a>'
