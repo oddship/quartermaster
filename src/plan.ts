@@ -17,7 +17,7 @@ const DependencyUpdateSchema = Type.Object(
     changelog_url: Type.Optional(Type.String()),
     breaking_changes: Type.Optional(Type.String()),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const RepoContextSchema = Type.Object(
@@ -28,7 +28,7 @@ const RepoContextSchema = Type.Object(
     default_branch: Type.String({ minLength: 1 }),
     lock_files: Type.Array(Type.String()),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const CreateMrActionSchema = Type.Object(
@@ -49,7 +49,7 @@ const CreateMrActionSchema = Type.Object(
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
     working_dir: Type.Optional(Type.String({ minLength: 1 })),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const UpdateMrActionSchema = Type.Object(
@@ -66,7 +66,7 @@ const UpdateMrActionSchema = Type.Object(
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
     working_dir: Type.Optional(Type.String({ minLength: 1 })),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const CreateIssueActionSchema = Type.Object(
@@ -77,7 +77,7 @@ const CreateIssueActionSchema = Type.Object(
     labels: Type.Array(Type.String()),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const CommentIssueActionSchema = Type.Object(
@@ -87,7 +87,7 @@ const CommentIssueActionSchema = Type.Object(
     body: Type.String({ minLength: 1 }),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const CommentMrActionSchema = Type.Object(
@@ -97,7 +97,7 @@ const CommentMrActionSchema = Type.Object(
     body: Type.String({ minLength: 1 }),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const CloseMrActionSchema = Type.Object(
@@ -108,7 +108,7 @@ const CloseMrActionSchema = Type.Object(
     delete_branch: Type.Boolean(),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const SkipActionSchema = Type.Object(
@@ -124,7 +124,7 @@ const SkipActionSchema = Type.Object(
     ]),
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );
 
 const ActionSchema = Type.Union([
@@ -142,5 +142,5 @@ export const SUBMIT_PLAN_SCHEMA = Type.Object(
     repo_context: RepoContextSchema,
     actions: Type.Array(ActionSchema, { maxItems: 20 }),
   },
-  { additionalProperties: false },
+  { additionalProperties: true },
 );

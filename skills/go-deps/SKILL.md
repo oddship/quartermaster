@@ -14,24 +14,10 @@ Load this skill when you find `go.mod` in the repository.
 For repos with one `go.mod` (no `go.work`), run:
 
 ```bash
-go list -m -u -json all 2>/dev/null | python3 -c "
-import json, sys
-data = sys.stdin.read()
-decoder = json.JSONDecoder()
-pos = 0
-while pos < len(data):
-    data_stripped = data[pos:].lstrip()
-    if not data_stripped: break
-    pos = len(data) - len(data_stripped)
-    obj, end = decoder.raw_decode(data, pos)
-    pos += end - pos + (len(data[pos:]) - len(data[pos:].lstrip()))
-    if obj.get('Main') or not obj.get('Update'): continue
-    if obj.get('Indirect'): continue
-    cur = obj['Version']
-    upd = obj['Update']['Version']
-    print(f'{obj[\"Path\"]}: {cur} -> {upd}')
-"
+go list -m -u -json all 2>/dev/null | jq -r 'select(.Update and (.Main | not) and (.Indirect | not)) | "\(.Path): \(.Version) -> \(.Update.Version)"'
 ```
+
+IMPORTANT: ALWAYS pipe `go list -m -u -json all` through `jq` to filter the output. NEVER run it without the jq filter - the raw JSON output can be extremely large (megabytes) and will cause context overflow errors.
 
 Focus on DIRECT dependencies only (Indirect=false). Transitive deps are not worth updating unless they have security issues.
 
@@ -40,27 +26,9 @@ Focus on DIRECT dependencies only (Indirect=false). Transitive deps are not wort
 If `go.work` exists, the workspace-level `go list -m -u -json all` does NOT show updates for workspace members. You MUST check each module individually with `GOWORK=off`:
 
 ```bash
-for dir in . maps parsers/* providers/*; do
-  if [ -f "$dir/go.mod" ]; then
-    echo "=== $dir ==="
-    cd "$dir" && GOWORK=off go list -m -u -json all 2>/dev/null | python3 -c "
-import json, sys
-data = sys.stdin.read()
-decoder = json.JSONDecoder()
-pos = 0
-while pos < len(data):
-    data_stripped = data[pos:].lstrip()
-    if not data_stripped: break
-    pos = len(data) - len(data_stripped)
-    obj, end = decoder.raw_decode(data, pos)
-    pos += end - pos + (len(data[pos:]) - len(data[pos:].lstrip()))
-    if obj.get('Main') or not obj.get('Update'): continue
-    if obj.get('Indirect'): continue
-    cur = obj['Version']
-    upd = obj['Update']['Version']
-    print(f'  DIRECT: {obj[\"Path\"]}: {cur} -> {upd}')
-" && cd - > /dev/null
-  fi
+for dir in $(find . -name go.mod -not -path './.git/*' | sed 's|/go.mod||' | sort); do
+  echo "=== $dir ==="
+  (cd "$dir" && GOWORK=off go list -m -u -json all 2>/dev/null | jq -r 'select(.Update and (.Main | not) and (.Indirect | not)) | "  DIRECT: \(.Path): \(.Version) -> \(.Update.Version)"')
 done
 ```
 
@@ -72,15 +40,10 @@ For repos with private modules (e.g. `go.zerodha.tech`, internal registries), `g
 
 **Option 1**: Skip private module checksums:
 ```bash
-GONOSUMCHECK=go.zerodha.tech GONOSUMDB=go.zerodha.tech GOFLAGS=-mod=mod go list -m -u -json all 2>/dev/null | ...
+GONOSUMCHECK=go.zerodha.tech GONOSUMDB=go.zerodha.tech GOFLAGS=-mod=mod go list -m -u -json all 2>/dev/null | jq -r 'select(.Update and (.Main | not) and (.Indirect | not)) | "\(.Path): \(.Version) -> \(.Update.Version)"'
 ```
 
-**Option 2**: Parse error messages - they often reveal available versions:
-```bash
-go list -m -u -json all 2>&1 | grep -oP 'verifying go.mod: \K[^@]*@[^/]*' | sort -u
-```
-
-**Option 3**: Check individual public packages manually:
+**Option 2**: Check individual public packages manually:
 ```bash
 go list -m -versions github.com/some/package
 ```

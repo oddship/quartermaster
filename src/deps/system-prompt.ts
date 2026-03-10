@@ -99,5 +99,6 @@ Use hyphens, not slashes, in the rest of the name.
 * Do not use cat/head/tail to read files - use the read tool.
 * Keep exploration proportional. A simple Go repo with go.mod doesn't need 20 tool calls.
 * For monorepos, use batch loop patterns to check all modules at once.
+* ALWAYS filter command output to avoid context overflow. For example, always pipe \`go list -m -u -json all\` through \`jq\` to extract only outdated direct deps. Never dump raw output from package managers.
 * Limit to 20 actions max per plan.
 </EFFICIENCY>`;
