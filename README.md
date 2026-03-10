@@ -12,23 +12,42 @@ A scheduled AI agent framework for repository maintenance. Runs on a schedule, i
 
 ## Missions
 
-Quartermaster is built around "missions" - pluggable maintenance tasks that run on a schedule.
+Quartermaster is built around "missions" - pluggable maintenance tasks defined as directories of markdown and JSON files. No code changes needed to add a mission.
 
-### Dependency updates (v0.1)
+### Built-in missions
 
-The first mission scans for outdated dependencies, batches patch/minor updates into PRs with fallback strategies, and flags major version bumps as issues for human review.
+| Mission | Description |
+|---------|-------------|
+| `deps` | Scan for outdated dependencies, batch patch/minor into PRs, flag major bumps as issues |
+| `docs-drift` | Detect documentation that has drifted from source code changes |
 
-Supports Go, Node.js (npm/yarn/pnpm/bun), Python (pip/poetry), Ruby (bundler), and Rust (cargo). Monorepo-aware.
+The `deps` mission supports Go, Node.js (npm/yarn/pnpm/bun), Python (pip/poetry), Ruby (bundler), and Rust (cargo). Monorepo-aware.
 
-*More missions coming - security audits, license compliance, changelog generation, code quality reports.*
+### Custom missions
+
+A mission is just a directory:
+
+```
+missions/my-mission/
+  mission.json          # name and description
+  system-prompt.md      # agent instructions
+  prompt.md             # template with {repo_dir}, {existing_mrs}, etc.
+  allowlist.json        # commands the executor may run
+  skills/               # optional Pi SDK skills
+```
+
+See `examples/mission-skeleton/` for a starter template.
 
 ## Quick start
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Scan a repo
-quartermaster scan --repo-dir ./my-repo --model anthropic/claude-sonnet-4-6
+# Scan for outdated dependencies (default mission)
+quartermaster scan --repo-dir ./my-repo
+
+# Scan for documentation drift
+quartermaster scan --mission docs-drift --repo-dir ./my-repo
 
 # Review what it found
 quartermaster validate plan.json
@@ -40,8 +59,27 @@ quartermaster execute plan.json --repo-dir ./my-repo --execute
 Or run the full pipeline:
 
 ```bash
-quartermaster run --repo-dir ./my-repo --model anthropic/claude-sonnet-4-6 --execute
+quartermaster run --repo-dir ./my-repo --execute
 ```
+
+## Docker
+
+The base image ships the framework and built-in missions. Language toolchains come from your CI runner or a derived image.
+
+```bash
+# Run directly
+docker run --rm \
+  -e ANTHROPIC_API_KEY \
+  -v /path/to/repo:/workspace \
+  ghcr.io/oddship/quartermaster:latest \
+  scan --repo-dir /workspace
+
+# Extend with Go toolchain
+FROM ghcr.io/oddship/quartermaster:latest
+RUN apt-get update && apt-get install -y golang-go
+```
+
+See `examples/Dockerfile.deps-go` and `examples/Dockerfile.deps-node` for complete examples.
 
 ## CI
 
@@ -62,7 +100,7 @@ jobs:
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - run: gh auth setup-git
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
-      - run: bun run /app/dist/cli.js run --repo-dir $GITHUB_WORKSPACE --model anthropic/claude-sonnet-4-6 --execute
+      - run: bun run /app/dist/cli.js run --repo-dir $GITHUB_WORKSPACE --execute
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,13 +122,13 @@ quartermaster-deps:
 
 ## Supported models
 
-Works with any LLM via the Pi SDK:
+Works with any LLM via the Pi SDK. Default: `anthropic/claude-sonnet-4-20250514`.
 
 ```
-anthropic/claude-sonnet-4-6    # ANTHROPIC_API_KEY
-google/gemini-2.5-flash        # GEMINI_API_KEY
-openai/gpt-4o                  # OPENAI_API_KEY
-bedrock/converse/arn:aws:...   # AWS IAM
+anthropic/claude-sonnet-4-20250514   # ANTHROPIC_API_KEY
+google/gemini-2.5-flash              # GEMINI_API_KEY
+openai/gpt-4o                        # OPENAI_API_KEY
+bedrock/converse/arn:aws:...         # AWS IAM
 ```
 
 ## License

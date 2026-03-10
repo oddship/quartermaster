@@ -14,6 +14,8 @@ Quartermaster runs as a Docker container or directly with Bun.
 docker pull ghcr.io/oddship/quartermaster:latest
 ```
 
+The base image includes the framework and built-in missions. Language toolchains (Go, Node, etc.) come from your CI runner or a [derived image](https://github.com/oddship/quartermaster/tree/main/examples).
+
 ### From source
 
 ```bash
@@ -35,15 +37,18 @@ export OPENAI_API_KEY=sk-...           # GPT
 ## Scan a repo
 
 ```bash
-# From source
-bun run src/cli.ts scan --repo-dir /path/to/your/repo --model anthropic/claude-sonnet-4-6
+# Dependency updates (default mission)
+quartermaster scan --repo-dir /path/to/your/repo
+
+# Documentation drift detection
+quartermaster scan --mission docs-drift --repo-dir /path/to/your/repo
 
 # Docker
 docker run --rm \
   -e ANTHROPIC_API_KEY \
   -v /path/to/your/repo:/workspace \
   ghcr.io/oddship/quartermaster:latest \
-  scan --repo-dir /workspace --model anthropic/claude-sonnet-4-6
+  scan --repo-dir /workspace
 ```
 
 This produces a `plan.json` with the agent's recommendations.
@@ -52,10 +57,10 @@ This produces a `plan.json` with the agent's recommendations.
 
 ```bash
 # Validate the plan
-bun run src/cli.ts validate plan.json
+quartermaster validate plan.json
 
 # Dry-run the executor (see what would happen)
-bun run src/cli.ts execute plan.json --repo-dir /path/to/your/repo
+quartermaster execute plan.json --repo-dir /path/to/your/repo
 ```
 
 ## Execute the plan
@@ -63,7 +68,7 @@ bun run src/cli.ts execute plan.json --repo-dir /path/to/your/repo
 When you're ready to create PRs and issues:
 
 ```bash
-bun run src/cli.ts execute plan.json --repo-dir /path/to/your/repo --execute
+quartermaster execute plan.json --repo-dir /path/to/your/repo --execute
 ```
 
 This creates branches, runs the whitelisted commands, tests, commits, pushes, and opens PRs/issues via `gh` or `glab`.
@@ -73,7 +78,7 @@ This creates branches, runs the whitelisted commands, tests, commits, pushes, an
 Run scan + execute in one command:
 
 ```bash
-bun run src/cli.ts run --repo-dir /path/to/your/repo --model anthropic/claude-sonnet-4-6 --execute
+quartermaster run --repo-dir /path/to/your/repo --execute
 ```
 
 Omit `--execute` for a dry run (default).

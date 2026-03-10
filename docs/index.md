@@ -19,7 +19,7 @@ description: A scheduled AI agent framework for repository maintenance.
 <article class="card">
 <header><h3>Mission-based</h3></header>
 
-Pluggable maintenance tasks that run on a schedule. Dependency updates ships first. Security audits, license compliance, and more to come.
+Pluggable maintenance tasks defined as plain files. Ships with dependency updates and documentation drift detection. Add your own with just markdown and JSON.
 </article>
 
 <article class="card">

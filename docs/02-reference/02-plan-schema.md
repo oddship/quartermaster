@@ -51,8 +51,8 @@ Create a branch, run commands, test, commit, push, and open a PR/MR.
 | `title` | yes | PR/MR title |
 | `description` | yes | PR/MR body (markdown) |
 | `updates` | yes | List of dependency updates |
-| `commands` | yes | Allowlisted commands to run |
-| `test_command` | yes | Command to verify the update |
+| `commands` | yes | Commands from the mission's allowlist |
+| `test_command` | yes | Command to verify the update (must be a known test runner) |
 | `labels` | yes | Labels to apply |
 | `fallback_strategy` | yes | `batch`, `individual_on_failure`, or `individual` |
 | `confidence` | yes | 0-1 confidence score |
@@ -79,7 +79,7 @@ Update an existing quartermaster PR (rebase, re-apply commands, force push).
 
 ### `create_issue`
 
-Open an issue (typically for major version bumps).
+Open an issue (for major version bumps, drift findings, etc.).
 
 ```json
 {
@@ -116,7 +116,7 @@ Close a stale quartermaster PR.
 
 ### `skip`
 
-Skip a package with a reason.
+Skip an item with a reason.
 
 ```json
 {
@@ -128,11 +128,15 @@ Skip a package with a reason.
 }
 ```
 
-Reason types: `human_hold`, `recently_updated`, `no_update_available`, `pinned`.
+Reason types: `human_hold`, `recently_updated`, `no_update_available`, `pinned`, `not_applicable`.
+
+Not every mission uses every action type. For example, the `docs-drift` mission only produces `create_issue` and `skip` actions.
 
 ## Command allowlist
 
-Only these commands are allowed in `commands`:
+Each mission defines its own allowlist in `allowlist.json`. Commands in `create_mr` and `update_mr` actions must match the active mission's allowlist.
+
+### deps mission allowlist
 
 | Ecosystem | Allowed commands |
 |-----------|-----------------|
@@ -146,10 +150,19 @@ Only these commands are allowed in `commands`:
 | bundle | `bundle update <pkg>` |
 | cargo | `cargo update -p <pkg>` |
 
+### docs-drift mission allowlist
+
+Empty - the docs-drift mission is read-only and only creates issues.
+
+### Test command allowlist
+
+Test commands (`test_command` field) are restricted to known test runner binaries: `go`, `npm`, `yarn`, `pnpm`, `bun`, `make`, `cargo`, `pytest`, `python`, `python3`, `ruby`, `bundle`, `mvn`, `gradle`, `dotnet`.
+
 ## Validation rules
 
 - Branch must match `quartermaster/*`
-- All commands must be in the allowlist
+- All commands must be in the mission's allowlist
+- Test commands must use an allowed test runner binary
 - Confidence must be 0-1
 - Maximum 20 actions per plan
 - `working_dir` must be relative (no `..` or absolute paths)
