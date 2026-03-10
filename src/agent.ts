@@ -261,12 +261,26 @@ export async function scanRepo(opts: {
   });
 
   logger.info("Sending prompt to agent...");
-  await session.prompt(prompt);
 
-  // Check for errors
-  const agentError = (session as unknown as { state: { error?: string } }).state?.error;
-  if (agentError) {
-    throw new Error(`LLM request failed: ${agentError}`);
+  // Retry on transient LLM errors (e.g. JSON parse failures in tool calls).
+  // The session keeps its state, so a retry continues the conversation.
+  const MAX_PROMPT_RETRIES = 2;
+  for (let attempt = 0; attempt <= MAX_PROMPT_RETRIES; attempt++) {
+    await session.prompt(attempt === 0 ? prompt : "Continue. Submit your plan via the submit_plan tool.");
+
+    const agentError = (session as unknown as { state: { error?: string } }).state?.error;
+    if (agentError) {
+      if (attempt < MAX_PROMPT_RETRIES && /parse|json|malformed/i.test(agentError)) {
+        logger.warn(`LLM error (attempt ${attempt + 1}/${MAX_PROMPT_RETRIES + 1}), retrying: ${agentError}`);
+        // Clear the error so the session can continue
+        (session as unknown as { state: { error?: string } }).state.error = undefined;
+        continue;
+      }
+      throw new Error(`LLM request failed: ${agentError}`);
+    }
+
+    // If we got a plan, break out
+    if (submittedPlan) break;
   }
 
   if (!submittedPlan) {
