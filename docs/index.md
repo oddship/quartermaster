@@ -1,12 +1,12 @@
 ---
 title: Quartermaster
 layout: landing
-description: An AI agent that keeps your dependencies up to date.
+description: A scheduled AI agent framework for repository maintenance.
 ---
 
 # Quartermaster
 
-<h3 class="tagline text-light">An AI agent that keeps your dependencies up to date.</h3>
+<h3 class="tagline text-light">A scheduled AI agent framework for repository maintenance.</h3>
 
 <div class="hstack">
   <a href="guide/quickstart/" class="button">Get started</a>
@@ -17,9 +17,9 @@ description: An AI agent that keeps your dependencies up to date.
 
 <div class="features">
 <article class="card">
-<header><h3>Intelligent scanning</h3></header>
+<header><h3>Mission-based</h3></header>
 
-An AI agent explores your repo, understands the build system, and finds outdated dependencies. It groups updates intelligently - patch bumps batched, major versions flagged as issues.
+Pluggable maintenance tasks that run on a schedule. Dependency updates ships first. Security audits, license compliance, and more to come.
 </article>
 
 <article class="card">

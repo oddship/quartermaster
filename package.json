@@ -1,7 +1,7 @@
 {
   "name": "quartermaster",
   "version": "0.1.0",
-  "description": "Scheduled agent framework for repository maintenance - dependency updates, security audits, and more",
+  "description": "A scheduled AI agent framework for repository maintenance",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

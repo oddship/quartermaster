@@ -4,7 +4,9 @@ title: How it works
 
 # How it works
 
-Quartermaster splits the work into two phases: an AI agent that reads, and a deterministic executor that writes.
+Quartermaster is a framework for scheduled repository maintenance. It's built around "missions" - pluggable tasks like dependency updates, security audits, or license compliance. Each mission shares the same architecture: an AI agent that reads, and a deterministic executor that writes.
+
+The first mission is **dependency updates** (v0.1). The framework is designed so adding new missions means adding new prompts, skills, and action types - not rewriting the core.
 
 ## Architecture
 

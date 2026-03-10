@@ -1,16 +1,26 @@
 # Quartermaster
 
-An AI agent that keeps your dependencies up to date. Runs on a schedule, scans for outdated packages, and creates pull requests and issues.
+A scheduled AI agent framework for repository maintenance. Runs on a schedule, inspects your repos, and takes action - creating pull requests, issues, and follow-ups.
 
 **[Documentation](https://oddship.github.io/quartermaster/)**
 
 ## How it works
 
 1. An AI agent scans your repo (read-only) and produces a JSON action plan
-2. A deterministic executor validates the plan and creates PRs/issues
+2. A deterministic executor validates the plan and carries it out
 3. Only whitelisted commands are allowed. Dry-run by default.
 
-The agent batches patch/minor updates into PRs with fallback strategies, and flags major version bumps as issues for human review.
+## Missions
+
+Quartermaster is built around "missions" - pluggable maintenance tasks that run on a schedule.
+
+### Dependency updates (v0.1)
+
+The first mission scans for outdated dependencies, batches patch/minor updates into PRs with fallback strategies, and flags major version bumps as issues for human review.
+
+Supports Go, Node.js (npm/yarn/pnpm/bun), Python (pip/poetry), Ruby (bundler), and Rust (cargo). Monorepo-aware.
+
+*More missions coming - security audits, license compliance, changelog generation, code quality reports.*
 
 ## Quick start
 
@@ -71,10 +81,6 @@ quartermaster-deps:
   variables:
     QUARTERMASTER_DRY_RUN: "false"
 ```
-
-## Supported ecosystems
-
-Go, Node.js (npm/yarn/pnpm/bun), Python (pip/poetry), Ruby (bundler), Rust (cargo).
 
 ## Supported models
 
