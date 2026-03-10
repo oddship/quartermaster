@@ -4,7 +4,7 @@
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { logger } from "./utils/logger.js";
 import { exec } from "./utils/exec.js";
-import { parseModelString, mapReasoningEffort, getApiKey } from "./model.js";
+import { parseModelString, mapReasoningEffort } from "./model.js";
 import { SUBMIT_PLAN_SCHEMA } from "./plan.js";
 import { validatePlan } from "./validator.js";
 import { DEPS_SYSTEM_PROMPT } from "./deps/system-prompt.js";
@@ -59,19 +59,6 @@ export async function scanRepo(opts: {
   // Preflight: validate model
   const parsed = parseModelString(model);
   const thinkingLevel = mapReasoningEffort(reasoningEffort);
-  const apiKey = getApiKey(model);
-
-  // Snapshot env vars
-  const envSnapshot: Record<string, string | undefined> = {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    AWS_REGION: process.env.AWS_REGION,
-  };
-
-  if (apiKey) {
-    if (parsed.provider === "anthropic") process.env.ANTHROPIC_API_KEY = apiKey;
-    else if (parsed.provider === "openai") process.env.OPENAI_API_KEY = apiKey;
-  }
 
   // Import Pi SDK
   const {
@@ -319,12 +306,6 @@ export async function scanRepo(opts: {
       totalTokens += msg.usage.totalTokens ?? 0;
       cost += msg.usage.cost?.total ?? 0;
     }
-  }
-
-  // Restore env
-  for (const [key, val] of Object.entries(envSnapshot)) {
-    if (val === undefined) delete process.env[key];
-    else process.env[key] = val;
   }
 
   return {
