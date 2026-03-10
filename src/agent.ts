@@ -338,14 +338,15 @@ export async function scanRepo(opts: {
 async function gatherExistingMrs(repoDir: string, platform: Platform, projectUrl: string): Promise<string> {
   try {
     if (platform === "gitlab" && projectUrl) {
+      // glab mr list defaults to open MRs; use -F for output format
       const { stdout } = await exec("glab", [
-        "mr", "list", "--label=quartermaster", "--state=opened", "--output=json",
+        "mr", "list", "--label", "quartermaster", "-F", "json",
       ], { cwd: repoDir });
       return stdout.trim() || "None found.";
     }
     if (platform === "github") {
       const { stdout } = await exec("gh", [
-        "pr", "list", "--label=quartermaster", "--state=open", "--json=number,title,headRefName,url",
+        "pr", "list", "--label", "quartermaster", "--state", "open", "--json", "number,title,headRefName,url",
       ], { cwd: repoDir });
       return stdout.trim() || "None found.";
     }
@@ -358,14 +359,15 @@ async function gatherExistingMrs(repoDir: string, platform: Platform, projectUrl
 async function gatherExistingIssues(repoDir: string, platform: Platform, projectUrl: string): Promise<string> {
   try {
     if (platform === "gitlab" && projectUrl) {
+      // glab issue list defaults to open issues; use -O for output format
       const { stdout } = await exec("glab", [
-        "issue", "list", "--label=quartermaster", "--state=opened", "--output=json",
+        "issue", "list", "--label", "quartermaster", "-O", "json",
       ], { cwd: repoDir });
       return stdout.trim() || "None found.";
     }
     if (platform === "github") {
       const { stdout } = await exec("gh", [
-        "issue", "list", "--label=quartermaster", "--state=open", "--json=number,title,url",
+        "issue", "list", "--label", "quartermaster", "--state", "open", "--json", "number,title,url",
       ], { cwd: repoDir });
       return stdout.trim() || "None found.";
     }
