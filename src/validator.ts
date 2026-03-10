@@ -83,7 +83,7 @@ function validateAction(
       // IDs validated in Phase 4 (live checks)
       break;
     case "skip":
-      trackPackage(action.package, index, seenPackages, warnings);
+      trackPackage(action.package, undefined, index, seenPackages, warnings);
       break;
     default:
       errors.push({
@@ -125,7 +125,7 @@ function validateCreateMr(
 
   // Track packages for duplicate detection
   for (const update of action.updates) {
-    trackPackage(update.package, index, seenPackages, warnings);
+    trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
   }
 }
 
@@ -160,7 +160,7 @@ function validateUpdateMr(
 
   // Track packages
   for (const update of action.updates) {
-    trackPackage(update.package, index, seenPackages, warnings);
+    trackPackage(update.package, action.working_dir, index, seenPackages, warnings);
   }
 }
 
@@ -181,16 +181,20 @@ function validateWorkingDir(
 
 function trackPackage(
   pkg: string,
+  workingDir: string | undefined,
   index: number,
   seenPackages: Map<string, number>,
   warnings: string[],
 ): void {
-  const prev = seenPackages.get(pkg);
+  // For monorepos, scope duplicates by working_dir - same package in different
+  // subdirectories is expected (each has its own go.mod/package.json).
+  const key = workingDir ? `${workingDir}:${pkg}` : pkg;
+  const prev = seenPackages.get(key);
   if (prev !== undefined) {
     warnings.push(
       `Package "${pkg}" appears in both action ${prev} and action ${index} - possible duplicate`,
     );
   } else {
-    seenPackages.set(pkg, index);
+    seenPackages.set(key, index);
   }
 }

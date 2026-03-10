@@ -68,6 +68,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=build /build/dist ./dist
 COPY --from=build /build/templates ./templates
 COPY --from=build /build/package.json ./
+COPY skills ./skills
 
 ENV COLUMNS=200
 ENV LINES=50

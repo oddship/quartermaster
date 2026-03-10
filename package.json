@@ -18,7 +18,8 @@
   },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "skills"
   ],
   "keywords": [
     "ai",

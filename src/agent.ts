@@ -132,18 +132,31 @@ export async function scanRepo(opts: {
   const settingsManager = SettingsManager.inMemory({
     compaction: { enabled: false },
   });
+
+  // Resolve skills directory (relative to this file -> ../skills in source, or ../skills from dist)
+  const { dirname: pathDirname, join: pathJoin } = await import("node:path");
+  const { fileURLToPath: toPath } = await import("node:url");
+  const currentDir = pathDirname(toPath(import.meta.url));
+  const skillsDir = pathJoin(currentDir, "..", "skills");
+
   const resourceLoader = new DefaultResourceLoader({
     cwd: repoDir,
     settingsManager,
     systemPrompt: DEPS_SYSTEM_PROMPT,
     appendSystemPrompt: "",
     noExtensions: true,
-    noSkills: true,
+    noSkills: false,
     noPromptTemplates: true,
     noThemes: true,
+    additionalSkillPaths: [skillsDir],
     agentsFilesOverride: () => ({ agentsFiles: [] }),
   });
   await resourceLoader.reload();
+
+  const { skills } = resourceLoader.getSkills();
+  if (skills.length > 0) {
+    logger.info(`Loaded ${skills.length} skill(s): ${skills.map((s) => s.name).join(", ")}`);
+  }
 
   let submittedPlan: Plan | null = null;
   let submitPlanCalls = 0;
