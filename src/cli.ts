@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import chalk from "chalk";
 
 import { validatePlan } from "./validator.js";
 import { detectPlatform } from "./platform.js";
+import { scanRepo } from "./agent.js";
+import type { AgentProgressEvent } from "./agent.js";
 import { setLogLevel } from "./utils/logger.js";
 import type { Plan, Platform } from "./types.js";
 
@@ -53,10 +55,82 @@ program
     console.log(chalk.dim(`Model: ${opts.model}`));
     console.log();
 
-    // Phase 3: agent session runs here
-    console.log(chalk.yellow("Agent session not yet implemented (Phase 3)"));
-    console.log(chalk.dim("Use 'quartermaster validate' with a plan file to test validation."));
-    process.exit(0);
+    const toolIcons: Record<string, string> = {
+      bash: "$", read: "cat", grep: "grep", find: "find", ls: "ls",
+    };
+
+    function handleEvent(event: AgentProgressEvent): void {
+      switch (event.type) {
+        case "agent_start":
+          console.log(chalk.dim("Agent started"));
+          break;
+        case "turn_start":
+          console.log(chalk.dim(`\n-- Turn ${event.turnIndex ?? "?"} --`));
+          break;
+        case "tool_start": {
+          const icon = toolIcons[event.toolName ?? ""] ?? event.toolName;
+          const preview = event.toolArgs ? ` ${event.toolArgs}` : "";
+          const truncated = preview.length > 160 ? preview.slice(0, 160) + "..." : preview;
+          console.log(chalk.green(`  ${icon}${truncated}`));
+          break;
+        }
+        case "tool_end": {
+          if (event.isError) console.log(chalk.red("  x error"));
+          if (event.result && opts.verbose) {
+            const lines = event.result.split("\n").slice(0, 6);
+            for (const line of lines) console.log(chalk.dim(`    ${line}`));
+          }
+          break;
+        }
+        case "text_delta":
+          if (opts.verbose && event.delta) process.stderr.write(event.delta);
+          break;
+        case "thinking_delta":
+          if (opts.verbose && event.delta) process.stderr.write(chalk.dim(event.delta));
+          break;
+        case "agent_end":
+          console.log(chalk.dim("\nExtracting plan..."));
+          break;
+      }
+    }
+
+    try {
+      const { plan, metrics } = await scanRepo({
+        repoDir,
+        platform: platformConfig.platform,
+        projectUrl: platformConfig.projectUrl,
+        defaultBranch: platformConfig.defaultBranch,
+        model: opts.model,
+        reasoningEffort: opts.reasoningEffort,
+        onEvent: handleEvent,
+      });
+
+      // Validate the plan
+      const validation = validatePlan(plan);
+      if (!validation.valid) {
+        console.log(chalk.yellow("\nWarning: agent produced an invalid plan:"));
+        for (const e of validation.errors) {
+          const loc = e.action_index >= 0 ? `action[${e.action_index}].${e.field}` : e.field;
+          console.log(chalk.yellow(`  - ${loc}: ${e.message}`));
+        }
+      }
+
+      // Write plan
+      const outputPath = resolve(opts.output);
+      writeFileSync(outputPath, JSON.stringify(plan, null, 2));
+      console.log(chalk.green(`\nPlan written to ${outputPath}`));
+      console.log(chalk.dim(`Actions: ${plan.actions.length}`));
+      console.log(chalk.dim(`Turns: ${metrics.turns}, Tool calls: ${metrics.toolCalls}`));
+      console.log(chalk.dim(`Tokens: ${metrics.totalTokens} (in: ${metrics.inputTokens}, out: ${metrics.outputTokens})`));
+      console.log(chalk.dim(`Cost: $${metrics.cost.toFixed(4)}`));
+      console.log(chalk.dim(`Duration: ${metrics.durationSeconds}s`));
+    } catch (err) {
+      console.error(chalk.red(`Scan failed: ${err instanceof Error ? err.message : err}`));
+      if (opts.verbose && err instanceof Error && err.stack) {
+        console.error(chalk.dim(err.stack));
+      }
+      process.exit(1);
+    }
   });
 
 // --- validate ---
