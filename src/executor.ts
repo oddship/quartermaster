@@ -4,7 +4,6 @@
 import { join } from "node:path";
 import { exec, type ExecResult } from "./utils/exec.js";
 import { isCommandAllowed, type AllowlistEntry } from "./mission.js";
-import { DEP_UPDATE_ALLOWLIST } from "./deps/allowlist.js";
 import { logger } from "./utils/logger.js";
 import type {
   Action,
@@ -509,7 +508,7 @@ async function hasGitChanges(cwd: string): Promise<boolean> {
 async function runAllowlistedCommands(
   commands: string[],
   cwd: string,
-  allowlist: AllowlistEntry[] = DEP_UPDATE_ALLOWLIST as AllowlistEntry[],
+  allowlist: AllowlistEntry[] = [],
 ): Promise<void> {
   for (const cmd of commands) {
     if (!isCommandAllowed(cmd, allowlist)) {

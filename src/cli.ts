@@ -138,6 +138,7 @@ program
   .command("validate")
   .description("Validate a plan JSON file")
   .argument("<plan-file>", "Path to plan JSON file")
+  .option("--mission <name>", "Mission (for allowlist selection)", "deps")
   .option("-v, --verbose", "Verbose logging", false)
   .action((planFile: string, opts) => {
     if (opts.verbose) setLogLevel("debug");
@@ -164,7 +165,8 @@ program
     console.log(chalk.dim(`Actions: ${plan.actions?.length ?? 0}`));
     console.log();
 
-    const result = validatePlan(plan);
+    const mission = getMission(opts.mission);
+    const result = validatePlan(plan, mission.allowlist);
 
     if (result.warnings.length > 0) {
       console.log(chalk.yellow("Warnings:"));

@@ -11,13 +11,11 @@ import type {
   ValidationError,
 } from "./types.js";
 import { findDisallowedCommands as findDisallowed, type AllowlistEntry } from "./mission.js";
-import { DEP_UPDATE_ALLOWLIST } from "./deps/allowlist.js";
 
 const BRANCH_PATTERN = /^quartermaster\/[\w.-]+$/;
 const MAX_ACTIONS = 20;
 
-export function validatePlan(plan: Plan, allowlist?: AllowlistEntry[]): ValidationResult {
-  const effectiveAllowlist = allowlist ?? (DEP_UPDATE_ALLOWLIST as AllowlistEntry[]);
+export function validatePlan(plan: Plan, allowlist: AllowlistEntry[] = []): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
 
@@ -45,7 +43,7 @@ export function validatePlan(plan: Plan, allowlist?: AllowlistEntry[]): Validati
 
   for (let i = 0; i < plan.actions.length; i++) {
     const action = plan.actions[i];
-    validateAction(action, i, errors, warnings, seenPackages, effectiveAllowlist);
+    validateAction(action, i, errors, warnings, seenPackages, allowlist);
   }
 
   return { valid: errors.length === 0, errors, warnings };
