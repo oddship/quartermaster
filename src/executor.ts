@@ -191,7 +191,7 @@ async function executeCreateMr(
     }
 
     // 5. Stage and commit
-    await git(repoDir, ["add", "-A"]);
+    await stageChanges(repoDir);
     const hasChanges = await hasGitChanges(repoDir);
     if (!hasChanges) {
       await git(repoDir, ["checkout", defaultBranch]);
@@ -262,7 +262,7 @@ async function executeIndividualFallback(
       }
 
       // Commit + push + create MR
-      await git(repoDir, ["add", "-A"]);
+      await stageChanges(repoDir);
       if (!(await hasGitChanges(repoDir))) {
         await git(repoDir, ["checkout", defaultBranch]);
         await git(repoDir, ["branch", "-D", branch]);
@@ -368,7 +368,7 @@ async function executeUpdateMr(
   }
 
   // 5. Commit + force push
-  await git(repoDir, ["add", "-A"]);
+  await stageChanges(repoDir);
   if (await hasGitChanges(repoDir)) {
     await git(repoDir, ["commit", "-m", `chore(deps): update dependencies`, "-m", action.description]);
     await git(repoDir, ["push", "--force-with-lease", "origin", action.branch]);
@@ -546,6 +546,18 @@ async function ensureBranch(cwd: string, branch: string): Promise<void> {
 async function hasGitChanges(cwd: string): Promise<boolean> {
   const { stdout } = await git(cwd, ["status", "--porcelain"]);
   return stdout.trim().length > 0;
+}
+
+/**
+ * Stage all changes but unstage quartermaster artifacts (plan.json, etc.)
+ * that shouldn't be committed to the target repo.
+ */
+async function stageChanges(cwd: string): Promise<void> {
+  await git(cwd, ["add", "-A"]);
+  // Unstage quartermaster artifacts that may be in the repo dir
+  for (const artifact of ["plan.json", ".glab-ci"]) {
+    await git(cwd, ["reset", "HEAD", "--", artifact]).catch(() => {});
+  }
 }
 
 async function runAllowlistedCommands(
