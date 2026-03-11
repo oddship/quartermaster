@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mission:
-        description: 'Mission to run'
+        description: 'Mission to run (scheduled runs both)'
         type: choice
         options:
           - deps
@@ -29,6 +29,11 @@ permissions:
 jobs:
   quartermaster:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Scheduled: run both missions. Manual: run selected mission only.
+        mission: ${{ github.event_name == 'schedule' && fromJson('["deps","docs-drift"]') || fromJson(format('["{0}"]', inputs.mission || 'deps')) }}
+      fail-fast: false
     steps:
       # Always checkout quartermaster for its source and missions
       - uses: actions/checkout@v4
@@ -53,7 +58,6 @@ jobs:
 
       - name: Run quartermaster
         run: |
-          MISSION="${{ inputs.mission || 'deps' }}"
           EXECUTE=""
           if [ "${{ inputs.dry_run }}" = "false" ]; then
             EXECUTE="--execute"
@@ -71,7 +75,7 @@ jobs:
           fi
 
           cd quartermaster && bun run src/cli.ts run \
-            --mission "$MISSION" \
+            --mission "${{ matrix.mission }}" \
             --repo-dir "$REPO_DIR" \
             -o "$GITHUB_WORKSPACE/plan.json" \
             $EXECUTE \
@@ -85,6 +89,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: quartermaster-plan
+          name: quartermaster-plan-${{ matrix.mission }}
           path: plan.json
           if-no-files-found: ignore
