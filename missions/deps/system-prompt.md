@@ -50,8 +50,19 @@ gh release list --repo <owner/repo> --limit 5 --json tagName --jq '.[].tagName' 
 glab release view <tag> --repo <owner/repo> 2>/dev/null
 ```
 
-**Fallback when release notes are unavailable** (private deps, non-GitHub hosts, no releases):
-- Check `CHANGELOG.md` or `HISTORY.md` in the package if accessible
+**When there are no formal releases** (tagged but no release notes):
+```bash
+# Compare two tags via GitHub API to get commit messages between versions
+gh api repos/<owner>/<repo>/compare/<old-tag>...<new-tag> \
+  --jq '"Commits: \(.commits | length)\n\(.commits[] | "- \(.commit.message | split("\n")[0])")"' 2>/dev/null
+
+# For Go modules, derive the repo and tags:
+# github.com/jmoiron/sqlx v1.3.3 -> v1.4.0
+# becomes: gh api repos/jmoiron/sqlx/compare/v1.3.3...v1.4.0
+```
+This gives you the commit messages between two versions - often more useful than release notes since you can see exactly what changed.
+
+**Fallback when git history is also unavailable** (private deps, non-GitHub/GitLab hosts):
 - Use `npm view <pkg> --json` to get description, homepage, and recent version dates
 - For Go: `go list -m -versions <module>` to see version history
 - If nothing is available, note "changelog not available" and still assess the version jump size
