@@ -8,7 +8,7 @@
 
 ## Task
 
-Analyze this repository for outdated dependencies and produce an update plan.
+Analyze this repository for outdated dependencies. Research what changed in each update. Produce an update plan with informed descriptions.
 
 ### Step 1: Understand the repo
 
@@ -19,12 +19,20 @@ Analyze this repository for outdated dependencies and produce an update plan.
 
 ### Step 2: Find outdated dependencies
 
-Run the appropriate read-only commands:
-- Go: `go list -m -u -json all`
-- Node: `npm outdated --json`
-- Python: `pip list --outdated --format=json`
+Use the recipes from the loaded skill (go-deps, node-deps, etc.) to scan for all outdated dependencies.
 
-### Step 3: Review existing state
+### Step 3: Research changelogs
+
+For each outdated dependency, look up what actually changed:
+- Use `npm view <pkg> repository.url` to find the GitHub repo
+- Use `gh release view <tag> --repo <owner/repo> --json body --jq '.body'` to fetch release notes
+- For major bumps: always fetch the release notes for the breaking version (e.g. v14.0.0)
+- For minor/patch: note any security fixes or notable new features
+- Assess whether breaking changes actually affect this repo's usage by checking how the package is used
+
+Skip changelog research for trivial packages (@types/*, etc.) - just note the version bump.
+
+### Step 4: Review existing state
 
 Check existing quartermaster MRs and issues. Read their comments to understand context.
 
@@ -34,13 +42,14 @@ Check existing quartermaster MRs and issues. Read their comments to understand c
 **Existing issues with "quartermaster" label:**
 {existing_issues}
 
-### Step 4: Produce the plan
+### Step 5: Produce the plan
 
-Based on your analysis, call `submit_plan` with:
-- `repo_context`: platform, ecosystems, test_command, default_branch, lock_files
-- `actions`: your proposed updates, issues, comments, or skips
+Call `submit_plan` with your actions. Include changelog summaries in descriptions.
 
-Remember:
+For `create_mr` descriptions, list each package with a one-line summary of what changed.
+For `create_issue` bodies, include the actual breaking changes and your assessment of impact on this repo.
+
+Rules:
 - Group patch/minor updates together when it makes sense
 - Create issues (not MRs) for major version bumps
 - Use `skip` for packages that are already current, pinned, or where a human said "hold off"
@@ -48,4 +57,4 @@ Remember:
 - Use `update_mr` if a quartermaster MR already exists for the same packages
 - Include `fallback_strategy: "individual_on_failure"` for batch MRs
 - Branch names must start with `quartermaster/`
-- Only suggest commands from the allowlist in the system prompt
+- Only suggest commands from the allowlist
