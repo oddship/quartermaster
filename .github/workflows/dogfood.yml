@@ -16,6 +16,10 @@ on:
         description: 'Dry run (no PRs/issues created)'
         type: boolean
         default: true
+      repo:
+        description: 'Repository to scan (owner/repo, default: self)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -26,11 +30,22 @@ jobs:
   quartermaster:
     runs-on: ubuntu-latest
     steps:
+      # Always checkout quartermaster for its source and missions
       - uses: actions/checkout@v4
+        with:
+          path: quartermaster
+
+      # If scanning a different repo, check it out too
+      - uses: actions/checkout@v4
+        if: ${{ inputs.repo != '' && inputs.repo != github.repository }}
+        with:
+          repository: ${{ inputs.repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: target-repo
 
       - uses: oven-sh/setup-bun@v2
 
-      - run: bun install --frozen-lockfile
+      - run: cd quartermaster && bun install --frozen-lockfile
 
       - run: gh auth setup-git
         env:
@@ -47,10 +62,18 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ]; then
             EXECUTE="--execute"
           fi
-          bun run src/cli.ts run \
+
+          # Determine target directory
+          if [ -n "${{ inputs.repo }}" ] && [ "${{ inputs.repo }}" != "${{ github.repository }}" ]; then
+            REPO_DIR="$GITHUB_WORKSPACE/target-repo"
+          else
+            REPO_DIR="$GITHUB_WORKSPACE/quartermaster"
+          fi
+
+          cd quartermaster && bun run src/cli.ts run \
             --mission "$MISSION" \
-            --repo-dir "$GITHUB_WORKSPACE" \
-            -o plan.json \
+            --repo-dir "$REPO_DIR" \
+            -o "$GITHUB_WORKSPACE/plan.json" \
             $EXECUTE \
             -v
         env:
