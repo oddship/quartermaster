@@ -28,19 +28,35 @@ Focus on DIRECT dependencies only. Ignore indirect/transitive deps unless they h
 **Step 4: Research changelogs**
 For each outdated dependency, look up what actually changed. This is critical for writing useful PR descriptions and issue bodies.
 
-For packages hosted on GitHub (most are):
-```bash
-# Get the repo URL from the package manager
-npm view <pkg> repository.url 2>/dev/null
+Try these approaches in order:
 
-# Fetch release notes for a specific version
+**GitHub-hosted packages** (most Go and Node packages):
+```bash
+# Go: derive repo from module path (github.com/gorilla/mux -> gorilla/mux)
+gh release view <tag> --repo <owner/repo> --json body --jq '.body' 2>/dev/null
+
+# Node: look up the repo URL first
+npm view <pkg> repository.url 2>/dev/null
+# Then fetch release notes
 gh release view <tag> --repo <owner/repo> --json body --jq '.body' 2>/dev/null
 
 # List recent releases if you need to find the right tag
 gh release list --repo <owner/repo> --limit 5 --json tagName --jq '.[].tagName' 2>/dev/null
 ```
 
-For Go modules, the GitHub repo is usually derivable from the module path (e.g. `github.com/gorilla/mux`).
+**GitLab-hosted packages** (e.g. go.zerodha.tech, gitlab.com):
+```bash
+# Use glab if available
+glab release view <tag> --repo <owner/repo> 2>/dev/null
+```
+
+**Fallback when release notes are unavailable** (private deps, non-GitHub hosts, no releases):
+- Check `CHANGELOG.md` or `HISTORY.md` in the package if accessible
+- Use `npm view <pkg> --json` to get description, homepage, and recent version dates
+- For Go: `go list -m -versions <module>` to see version history
+- If nothing is available, note "changelog not available" and still assess the version jump size
+
+Do NOT let missing changelogs block the plan. Produce the best description you can with available information. A version bump with "changelog not available, large version jump - test carefully" is better than no action at all.
 
 Focus on:
 - Breaking changes (for major bumps)
