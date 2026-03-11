@@ -535,7 +535,7 @@ async function git(cwd: string, args: string[]): Promise<ExecResult> {
 async function ensureBranch(cwd: string, branch: string): Promise<void> {
   // Check if branch exists locally
   const check = await exec("git", ["rev-parse", "--verify", branch], { cwd }).catch(() => null);
-  if (check?.exitCode === 0) return;
+  if (check?.stdout) return; // rev-parse succeeded, branch exists
 
   // Fetch and create local branch tracking remote
   logger.debug(`Branch '${branch}' not found locally, fetching from origin`);
