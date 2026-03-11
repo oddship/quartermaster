@@ -638,7 +638,6 @@ async function createMrOrPr(
   if (platform === "gitlab") {
     const args = [
       "mr", "create",
-      "--fill",
       "--title", action.title,
       "--description", action.description,
       "--source-branch", action.branch,
