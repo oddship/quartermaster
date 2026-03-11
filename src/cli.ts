@@ -255,6 +255,7 @@ program
       const result = await executePlan(plan, {
         repoDir,
         platform: platformConfig.platform,
+        projectUrl: platformConfig.projectUrl,
         defaultBranch: platformConfig.defaultBranch,
         dryRun,
         confidenceThreshold: threshold,
@@ -371,6 +372,7 @@ program
     const result = await executePlan(plan, {
       repoDir,
       platform: platformConfig.platform,
+      projectUrl: platformConfig.projectUrl,
       defaultBranch: platformConfig.defaultBranch,
       dryRun,
       confidenceThreshold: threshold,

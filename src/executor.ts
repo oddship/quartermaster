@@ -38,6 +38,7 @@ export interface ExecutionResult {
 export interface ExecutorOptions {
   repoDir: string;
   platform: Platform;
+  projectUrl: string;
   defaultBranch: string;
   dryRun: boolean;
   confidenceThreshold: number;
@@ -53,6 +54,32 @@ export async function executePlan(
   opts: ExecutorOptions,
 ): Promise<ExecutionResult> {
   const results: ActionResult[] = [];
+
+  // Ensure default branch is available locally (CI runners may use detached HEAD)
+  if (!opts.dryRun) {
+    await ensureBranch(opts.repoDir, opts.defaultBranch);
+
+    // Configure git identity for commits
+    const gitUser = await exec("git", ["config", "user.name"], { cwd: opts.repoDir }).catch(() => null);
+    if (!gitUser?.stdout?.trim()) {
+      await git(opts.repoDir, ["config", "user.name", "Quartermaster"]);
+      await git(opts.repoDir, ["config", "user.email", "quartermaster@noreply"]);
+      logger.debug("Configured git identity for Quartermaster");
+    }
+
+    // For GitLab CI: configure push URL with token if available
+    if (opts.platform === "gitlab" && process.env.GITLAB_TOKEN) {
+      const projectUrl = opts.projectUrl;
+      if (projectUrl) {
+        const pushUrl = projectUrl.replace(
+          /^https:\/\//,
+          `https://oauth2:${process.env.GITLAB_TOKEN}@`,
+        );
+        await git(opts.repoDir, ["remote", "set-url", "--push", "origin", pushUrl]);
+        logger.debug("Configured git push URL with GitLab token");
+      }
+    }
+  }
 
   for (const [i, action] of plan.actions.entries()) {
     if (action.confidence < opts.confidenceThreshold) {
@@ -498,6 +525,22 @@ async function executeCloseMr(
 async function git(cwd: string, args: string[]): Promise<ExecResult> {
   logger.debug(`git ${args.join(" ")}`);
   return exec("git", args, { cwd });
+}
+
+/**
+ * Ensure the default branch is available locally.
+ * CI runners often checkout a detached HEAD at a specific SHA,
+ * so the default branch may not exist as a local ref.
+ */
+async function ensureBranch(cwd: string, branch: string): Promise<void> {
+  // Check if branch exists locally
+  const check = await exec("git", ["rev-parse", "--verify", branch], { cwd }).catch(() => null);
+  if (check?.exitCode === 0) return;
+
+  // Fetch and create local branch tracking remote
+  logger.debug(`Branch '${branch}' not found locally, fetching from origin`);
+  await git(cwd, ["fetch", "origin", branch]);
+  await git(cwd, ["checkout", "-b", branch, `origin/${branch}`]);
 }
 
 async function hasGitChanges(cwd: string): Promise<boolean> {
