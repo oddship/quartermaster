@@ -167,7 +167,8 @@ async function executeCreateMr(
   await git(repoDir, ["checkout", defaultBranch]);
   await git(repoDir, ["pull", "--ff-only", "origin", defaultBranch]);
 
-  // 2. Create branch
+  // 2. Create branch (delete if exists from a previous failed run)
+  await git(repoDir, ["branch", "-D", action.branch]).catch(() => {});
   await git(repoDir, ["checkout", "-b", action.branch]);
 
   try {
@@ -243,6 +244,7 @@ async function executeIndividualFallback(
 
     try {
       await git(repoDir, ["checkout", defaultBranch]);
+      await git(repoDir, ["branch", "-D", branch]).catch(() => {});
       await git(repoDir, ["checkout", "-b", branch]);
 
       // Build commands for this single update
